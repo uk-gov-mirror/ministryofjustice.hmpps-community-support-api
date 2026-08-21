@@ -26,7 +26,7 @@ import uk.gov.justice.digital.hmpps.communitysupportapi.dto.NeedsInterpreterBffR
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.OffenceSentenceInfoBffResponseDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.ProbationPractitionerDetailsBffResponseDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.ReferralCriminogenicNeedsDto
-import uk.gov.justice.digital.hmpps.communitysupportapi.dto.Selection
+import uk.gov.justice.digital.hmpps.communitysupportapi.dto.SelectionDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.TaskListStatusItem
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.TaskListStatusResponseDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.entity.ProbationPractitionerDetails
@@ -387,7 +387,7 @@ class DraftReferralControllerIntegrationTest : IntegrationTestBase() {
           body.refereeName.firstName shouldBe person.firstName
           body.refereeName.lastName shouldBe person.lastName
           body.needsAdditionalSupport shouldBe true
-          body.physicalHealth shouldBe Selection.Yes("Wheelchair access required")
+          body.physicalHealth shouldBe SelectionDto.Yes("Wheelchair access required")
         }
     }
   }
@@ -435,7 +435,7 @@ class DraftReferralControllerIntegrationTest : IntegrationTestBase() {
           val body = response.responseBody!!
           body.refereeName.firstName shouldBe person.firstName
           body.refereeName.lastName shouldBe person.lastName
-          body.language shouldBe Selection.Yes("Italian")
+          body.language shouldBe SelectionDto.Yes("Italian")
         }
     }
 
@@ -482,7 +482,7 @@ class DraftReferralControllerIntegrationTest : IntegrationTestBase() {
           val body = response.responseBody!!
           body.refereeName.firstName shouldBe person.firstName
           body.refereeName.lastName shouldBe person.lastName
-          body.language shouldBe Selection.No
+          body.language shouldBe SelectionDto.No
         }
     }
   }

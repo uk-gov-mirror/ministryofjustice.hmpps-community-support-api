@@ -44,6 +44,8 @@ class ReferralFactory : TestEntityFactory<Referral>() {
   private var targetServiceCompletionDate: OffsetDateTime? = OffsetDateTime.now().plusDays(30)
   private var targetServiceCompletionDateReason: String? = "A reason"
   private var serviceDays: Int? = null
+  private var hasAdditionalInformationForTheDeliveryPartner: Boolean? = null
+  private var additionalInformationForTheDeliveryPartner: String? = null
 
   fun withId(id: UUID) = apply { this.id = id }
   fun withPersonId(personId: UUID) = apply { this.personId = personId }
@@ -56,6 +58,8 @@ class ReferralFactory : TestEntityFactory<Referral>() {
   fun withTargetServiceCompletionDate(date: OffsetDateTime?) = apply { this.targetServiceCompletionDate = date }
   fun withTargetServiceCompletionDateReason(reason: String?) = apply { this.targetServiceCompletionDateReason = reason }
   fun withServiceDays(serviceDays: Int?) = apply { this.serviceDays = serviceDays }
+  fun withHasAdditionalInformationForTheDeliveryPartner(hasAdditionalInformationForTheDeliveryPartner: Boolean?) = apply { this.hasAdditionalInformationForTheDeliveryPartner = hasAdditionalInformationForTheDeliveryPartner }
+  fun withAdditionalInformationForTheDeliveryPartner(information: String?) = apply { this.additionalInformationForTheDeliveryPartner = information }
 
   fun withCreatedEvent(actorId: UUID = DEFAULT_ACTOR_ID, createdAt: OffsetDateTime? = null) = apply {
     events.add { referral ->
@@ -92,6 +96,8 @@ class ReferralFactory : TestEntityFactory<Referral>() {
       targetServiceCompletionDate = targetServiceCompletionDate,
       targetServiceCompletionDateReason = targetServiceCompletionDateReason,
       serviceDays = serviceDays,
+      hasAdditionalInformationForTheDeliveryPartner = hasAdditionalInformationForTheDeliveryPartner,
+      additionalInformationForTheDeliveryPartner = additionalInformationForTheDeliveryPartner,
     )
 
     // Add all configured events

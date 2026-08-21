@@ -688,6 +688,8 @@ class ReferralUserAssignmentServiceTest(@Autowired private val userService: User
         .withPersonId(person.id)
         .withCrn(person.identifier)
         .withSubmittedEvent(actorId = assignerId)
+        .withHasAdditionalInformationForTheDeliveryPartner(null)
+        .withAdditionalInformationForTheDeliveryPartner(null)
         .create(),
     )
     return savedReferral

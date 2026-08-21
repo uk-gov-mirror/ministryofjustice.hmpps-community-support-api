@@ -3,14 +3,18 @@ package uk.gov.justice.digital.hmpps.communitysupportapi.service
 import jakarta.validation.ValidationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import uk.gov.justice.digital.hmpps.communitysupportapi.dto.AdditionalInformationForTheDeliveryPartnerBffResponseDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.AdditionalSupportNeedsBffResponseDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.AreaConfirmationBffResponseDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.CommunityServiceProviderBffResponseDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.NeedsInterpreterBffResponseDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.OffenceSentenceInfoBffResponseDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.ProbationPractitionerDetailsBffResponseDto
+import uk.gov.justice.digital.hmpps.communitysupportapi.dto.SelectionDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.TaskListStatusResponseDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.delius.OffenceSentenceDto
+import uk.gov.justice.digital.hmpps.communitysupportapi.dto.toTriState
+import uk.gov.justice.digital.hmpps.communitysupportapi.dto.value
 import uk.gov.justice.digital.hmpps.communitysupportapi.entity.Person
 import uk.gov.justice.digital.hmpps.communitysupportapi.entity.PersonAdditionalSupportNeeds
 import uk.gov.justice.digital.hmpps.communitysupportapi.entity.ProbationPractitionerDetails
@@ -54,6 +58,7 @@ class DraftReferralService(
   private val probationPractitionerDetailsRepository: ProbationPractitionerDetailsRepository,
   private val identifierValidator: PersonIdentifierValidator,
   private val nDeliusService: NDeliusService,
+  private val timePort: TimePort,
 ) {
   private data class ReferralSupportNeedsContext(
     val referral: Referral,
@@ -374,6 +379,34 @@ class DraftReferralService(
     }
 
     return OffenceSentenceInfoBffResponseDto.from(person, offenceSentenceInfo)
+  }
+
+  fun getAdditionalInformationForTheDeliveryPartner(referralId: UUID): AdditionalInformationForTheDeliveryPartnerBffResponseDto {
+    val referral = referralRepository.findById(referralId)
+      .orElseThrow { NotFoundException("Referral not found for id $referralId") }
+
+    val person = personRepository.findById(referral.personId)
+      .orElseThrow { NotFoundException("Person not found for referral $referralId") }
+    return AdditionalInformationForTheDeliveryPartnerBffResponseDto.from(person, referral)
+  }
+
+  @Transactional
+  fun updateAdditionalInformationForTheDeliveryPartner(
+    referralId: UUID,
+    selection: SelectionDto,
+  ): AdditionalInformationForTheDeliveryPartnerBffResponseDto {
+    val referral = referralRepository.findById(referralId)
+      .orElseThrow { NotFoundException("Referral not found for id $referralId") }
+
+    val person = personRepository.findById(referral.personId)
+      .orElseThrow { NotFoundException("Person not found for referral $referralId") }
+
+    referral.hasAdditionalInformationForTheDeliveryPartner = selection.toTriState()
+    referral.additionalInformationForTheDeliveryPartner = selection.value()
+    referral.updatedAt = timePort.now()
+
+    referralRepository.save(referral)
+    return AdditionalInformationForTheDeliveryPartnerBffResponseDto.from(person, referral)
   }
 
   fun getProbationPractitionerDetails(referralId: UUID): ProbationPractitionerDetailsBffResponseDto {

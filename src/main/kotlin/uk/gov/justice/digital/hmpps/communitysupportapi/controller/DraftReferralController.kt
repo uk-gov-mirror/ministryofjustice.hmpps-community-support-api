@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RestController
 import uk.gov.justice.digital.hmpps.communitysupportapi.authorization.UserMapper
+import uk.gov.justice.digital.hmpps.communitysupportapi.dto.AdditionalInformationForTheDeliveryPartnerBffResponseDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.AdditionalSupportNeedsBffResponseDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.AreaConfirmationBffResponseDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.CheckDraftReferralDetailsBffResponseDto
@@ -22,6 +23,7 @@ import uk.gov.justice.digital.hmpps.communitysupportapi.dto.NeedsInterpreterBffR
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.OffenceSentenceInfoBffResponseDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.ProbationPractitionerDetailsBffResponseDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.ReferralCriminogenicNeedsDto
+import uk.gov.justice.digital.hmpps.communitysupportapi.dto.SelectionDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.TaskListStatusResponseDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.model.AdditionalSupportNeedsRequest
 import uk.gov.justice.digital.hmpps.communitysupportapi.model.CommunityServiceProviderRequest
@@ -332,6 +334,55 @@ class DraftReferralController(
     @PathVariable referralId: UUID,
   ): ResponseEntity<OffenceSentenceInfoBffResponseDto> = ResponseEntity.ok(
     draftReferralService.getOffenceSentenceDetails(referralId),
+  )
+
+  @Operation(summary = "Get additional information for the delivery partner for a draft referral")
+  @ApiResponses(
+    value = [
+      ApiResponse(
+        responseCode = "200",
+        description = "additional information found",
+        content = [
+          Content(
+            mediaType = "application/json",
+            schema = Schema(implementation = AdditionalInformationForTheDeliveryPartnerBffResponseDto::class),
+          ),
+        ],
+      ),
+      ApiResponse(
+        responseCode = "404",
+        description = "additional information not found",
+        content = [Content(mediaType = "application/json")],
+      ),
+    ],
+  )
+  @GetMapping("/bff/draft-referral/additional-information-for-the-delivery-partner/{referralId}")
+  fun getAdditionalInformationForTheDeliveryPartner(
+    @PathVariable referralId: UUID,
+  ): ResponseEntity<AdditionalInformationForTheDeliveryPartnerBffResponseDto> = ResponseEntity.ok(
+    draftReferralService.getAdditionalInformationForTheDeliveryPartner(referralId),
+  )
+
+  @Operation(summary = "Update additional information for the delivery partner for a referral")
+  @ApiResponses(
+    value = [
+      ApiResponse(
+        responseCode = "200",
+        description = "Additional information for the delivery partner updated",
+      ),
+      ApiResponse(
+        responseCode = "404",
+        description = "Referral not found",
+        content = [Content(mediaType = "application/json")],
+      ),
+    ],
+  )
+  @PatchMapping("/draft-referral/additional-information-for-the-delivery-partner/{referralId}")
+  fun updateAdditionalInformationForTheDeliveryPartner(
+    @PathVariable referralId: UUID,
+    @RequestBody request: SelectionDto,
+  ): ResponseEntity<AdditionalInformationForTheDeliveryPartnerBffResponseDto> = ResponseEntity.ok(
+    draftReferralService.updateAdditionalInformationForTheDeliveryPartner(referralId, request),
   )
 
   @Operation(summary = "Update the Offence and Sentence information for a Draft Referral")

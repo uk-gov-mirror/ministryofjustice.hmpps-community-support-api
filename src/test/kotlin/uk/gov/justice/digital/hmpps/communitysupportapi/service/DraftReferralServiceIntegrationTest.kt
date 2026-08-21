@@ -1,26 +1,19 @@
 package uk.gov.justice.digital.hmpps.communitysupportapi.service
 
-import com.github.tomakehurst.wiremock.client.WireMock.aResponse
-import com.github.tomakehurst.wiremock.client.WireMock.get
-import com.github.tomakehurst.wiremock.client.WireMock.stubFor
-import com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo
+import com.github.tomakehurst.wiremock.client.WireMock.*
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import uk.gov.justice.digital.hmpps.communitysupportapi.dto.SelectionDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.exception.NotFoundException
 import uk.gov.justice.digital.hmpps.communitysupportapi.integration.IntegrationTestBase
 import uk.gov.justice.digital.hmpps.communitysupportapi.integration.ReferralTestSupport
-import uk.gov.justice.digital.hmpps.communitysupportapi.model.AdditionalSupportNeedsRequest
-import uk.gov.justice.digital.hmpps.communitysupportapi.model.CommunityServiceProviderRequest
-import uk.gov.justice.digital.hmpps.communitysupportapi.model.CreateReferralRequest
-import uk.gov.justice.digital.hmpps.communitysupportapi.model.NeedsInterpreterRequest
-import uk.gov.justice.digital.hmpps.communitysupportapi.repository.CommunityServiceProviderRepository
-import uk.gov.justice.digital.hmpps.communitysupportapi.repository.PersonAdditionalSupportNeedsRepository
-import uk.gov.justice.digital.hmpps.communitysupportapi.repository.ReferralProviderAssignmentRepository
+import uk.gov.justice.digital.hmpps.communitysupportapi.model.*
+import uk.gov.justice.digital.hmpps.communitysupportapi.repository.*
 import uk.gov.justice.digital.hmpps.communitysupportapi.testdata.ExternalApiResponse.createCprProbationPersonDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.util.toJson
-import java.util.UUID
+import java.util.*
 
 class DraftReferralServiceIntegrationTest : IntegrationTestBase() {
 
@@ -212,6 +205,37 @@ class DraftReferralServiceIntegrationTest : IntegrationTestBase() {
 
     assertThatThrownBy { draftReferralService.upsertCommunityServiceProvider(savedReferral.id, request) }
       .isInstanceOf(NotFoundException::class.java)
+  }
+
+  @Test
+  fun getAdditionalInformationForTheDeliveryPartnerSmokeTest() {
+    val referralUser = referralHelper.ensureReferralUser()
+    val createReferralRequest = setUpData()
+
+    val result = referralService.createReferral(referralUser.id, createReferralRequest)
+    val savedReferral = result.referral
+    // create the selection to the database
+    run {
+      val request = SelectionDto.Yes("extra information for delivery partner")
+      val result = draftReferralService.updateAdditionalInformationForTheDeliveryPartner(savedReferral.id, request)
+      assertThat(result.details).isEqualTo(SelectionDto.Yes("extra information for delivery partner"))
+    }
+    // retrieve the selection from the database
+    run {
+      val result = draftReferralService.getAdditionalInformationForTheDeliveryPartner(savedReferral.id)
+      assertThat(result.details).isEqualTo(SelectionDto.Yes("extra information for delivery partner"))
+    }
+    // update the selection in the database
+    run {
+      val request = SelectionDto.No
+      val result = draftReferralService.updateAdditionalInformationForTheDeliveryPartner(savedReferral.id, request)
+      assertThat(result.details).isEqualTo(SelectionDto.No)
+    }
+    // check the selection in the database
+    run {
+      val result = draftReferralService.getAdditionalInformationForTheDeliveryPartner(savedReferral.id)
+      assertThat(result.details).isEqualTo(SelectionDto.No)
+    }
   }
 
   private fun setUpData(): CreateReferralRequest {
