@@ -21,6 +21,7 @@ import uk.gov.justice.digital.hmpps.communitysupportapi.repository.CommunityServ
 import uk.gov.justice.digital.hmpps.communitysupportapi.repository.PduRepository
 import uk.gov.justice.digital.hmpps.communitysupportapi.repository.PersonAdditionalSupportNeedsRepository
 import uk.gov.justice.digital.hmpps.communitysupportapi.repository.PersonRepository
+import uk.gov.justice.digital.hmpps.communitysupportapi.repository.ProbationPractitionerDetailsRepository
 import uk.gov.justice.digital.hmpps.communitysupportapi.repository.ReferralCriminogenicNeedsRepository
 import uk.gov.justice.digital.hmpps.communitysupportapi.repository.ReferralOffenceSentenceRepository
 import uk.gov.justice.digital.hmpps.communitysupportapi.repository.ReferralProviderAssignmentRepository
@@ -59,6 +60,9 @@ class DraftReferralServiceTest {
 
   @Mock
   lateinit var referralOffenceSentenceRepository: ReferralOffenceSentenceRepository
+
+  @Mock
+  lateinit var probationPractitionerDetailsRepository: ProbationPractitionerDetailsRepository
 
   @Mock
   lateinit var identifierValidator: PersonIdentifierValidator
