@@ -77,3 +77,4 @@ sonar-project.properties
 
 # snyk.io policy file
 .snyk
+/scratch/

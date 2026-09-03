@@ -47,6 +47,12 @@ class Referral(
   @Column(name = "service_days", nullable = true)
   var serviceDays: Int? = null,
 
+  @Column(name = "has_additonal_information_for_delivery_partner", nullable = true)
+  var hasAdditionalInformationForTheDeliveryPartner: Boolean? = null,
+
+  @Column(name = "additonal_information_for_delivery_partner", nullable = true)
+  var additionalInformationForTheDeliveryPartner: String? = null,
+
   @OneToMany(mappedBy = "referral", cascade = [CascadeType.PERSIST, CascadeType.MERGE], orphanRemoval = true)
   val referralEvents: MutableList<ReferralEvent> = mutableListOf(),
 ) {

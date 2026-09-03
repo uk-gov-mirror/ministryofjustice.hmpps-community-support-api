@@ -3,14 +3,18 @@ package uk.gov.justice.digital.hmpps.communitysupportapi.service
 import jakarta.validation.ValidationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import uk.gov.justice.digital.hmpps.communitysupportapi.dto.AdditionalInformationForTheDeliveryPartnerBffResponseDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.AdditionalSupportNeedsBffResponseDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.AreaConfirmationBffResponseDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.CommunityServiceProviderBffResponseDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.NeedsInterpreterBffResponseDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.OffenceSentenceInfoBffResponseDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.ProbationPractitionerDetailsBffResponseDto
+import uk.gov.justice.digital.hmpps.communitysupportapi.dto.SelectionDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.TaskListStatusResponseDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.delius.OffenceSentenceDto
+import uk.gov.justice.digital.hmpps.communitysupportapi.dto.toTriState
+import uk.gov.justice.digital.hmpps.communitysupportapi.dto.value
 import uk.gov.justice.digital.hmpps.communitysupportapi.entity.Person
 import uk.gov.justice.digital.hmpps.communitysupportapi.entity.PersonAdditionalSupportNeeds
 import uk.gov.justice.digital.hmpps.communitysupportapi.entity.ProbationPractitionerDetails
@@ -127,10 +131,13 @@ class DraftReferralService(
     request: NeedsInterpreterRequest,
   ): NeedsInterpreterBffResponseDto {
     val context = getReferralSupportNeedsContext(referralId)
-
+    println("upsertNeedsInterpreter - context.additionalSupportNeeds = ${context.additionalSupportNeeds}")
+    println("upsertNeedsInterpreter - request = $request")
     val personAdditionalSupportNeeds = if (context.additionalSupportNeeds == null) {
+      println("createNeedsInterpreter")
       createNeedsInterpreter(referralId, context.person.id, request, userId)
     } else {
+      println("updateNeedsInterpreter")
       updateNeedsInterpreter(context.additionalSupportNeeds, request, userId)
     }
 
@@ -227,7 +234,9 @@ class DraftReferralService(
     request: NeedsInterpreterRequest,
     createdBy: UUID,
   ): PersonAdditionalSupportNeeds {
+    println("createNeedsInterpreter - request = $request")
     val normalisedRequest = request.normaliseAgainstNeedsInterpreter()
+    println("createNeedsInterpreter - normalisedRequest = $normalisedRequest")
     val supportNeeds = PersonAdditionalSupportNeeds(
       id = UUID.randomUUID(),
       referralId = referralId,
@@ -237,6 +246,7 @@ class DraftReferralService(
       createdBy = createdBy,
       createdAt = OffsetDateTime.now(),
     )
+    println("createNeedsInterpreter - supportNeeds = $supportNeeds")
     return personAdditionalSupportNeedsRepository.save(supportNeeds)
   }
 
@@ -245,13 +255,16 @@ class DraftReferralService(
     newRecord: NeedsInterpreterRequest,
     updatedBy: UUID,
   ): PersonAdditionalSupportNeeds {
+    println("updateNeedsInterpreter - newRecord = $newRecord")
     val normalisedRecord = newRecord.normaliseAgainstNeedsInterpreter()
+    println("updateNeedsInterpreter - normalisedRecord = $normalisedRecord")
     val copyRecord = existingRecord.copy(
       interpreterLanguage = normalisedRecord.language,
       interpreterNeeded = normalisedRecord.needsInterpreter,
       updatedBy = updatedBy,
       updatedAt = OffsetDateTime.now(),
     )
+    println("updateNeedsInterpreter - copyRecord = $copyRecord")
     return personAdditionalSupportNeedsRepository.save(copyRecord)
   }
 
@@ -374,6 +387,35 @@ class DraftReferralService(
     }
 
     return OffenceSentenceInfoBffResponseDto.from(person, offenceSentenceInfo)
+  }
+
+  fun getAdditionalInformationForTheDeliveryPartner(referralId: UUID): AdditionalInformationForTheDeliveryPartnerBffResponseDto {
+    val referral = referralRepository.findById(referralId)
+      .orElseThrow { NotFoundException("Referral not found for id $referralId") }
+
+    val person = personRepository.findById(referral.personId)
+      .orElseThrow { NotFoundException("Person not found for referral $referralId") }
+    return AdditionalInformationForTheDeliveryPartnerBffResponseDto.from(person, referral)
+  }
+
+  @Transactional
+  fun updateAdditionalInformationForTheDeliveryPartner(
+    referralId: UUID,
+    selection: SelectionDto,
+    updatedAt: OffsetDateTime,
+  ): AdditionalInformationForTheDeliveryPartnerBffResponseDto {
+    val referral = referralRepository.findById(referralId)
+      .orElseThrow { NotFoundException("Referral not found for id $referralId") }
+
+    val person = personRepository.findById(referral.personId)
+      .orElseThrow { NotFoundException("Person not found for referral $referralId") }
+
+    referral.hasAdditionalInformationForTheDeliveryPartner = selection.toTriState()
+    referral.additionalInformationForTheDeliveryPartner = selection.value()
+    referral.updatedAt = updatedAt
+
+    referralRepository.save(referral)
+    return AdditionalInformationForTheDeliveryPartnerBffResponseDto.from(person, referral)
   }
 
   fun getProbationPractitionerDetails(referralId: UUID): ProbationPractitionerDetailsBffResponseDto {

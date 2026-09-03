@@ -18,6 +18,7 @@ import uk.gov.justice.digital.hmpps.communitysupportapi.integration.TestWebClien
     "services.core-person-record-api.base-url=http://localhost:9999",
     "services.assess-risks-and-needs-api.base-url=http://localhost:9999",
     "services.nDelius-api.base-url=http://localhost:9999",
+    "services.prison-api.base-url=http://localhost:9999",
   ],
 )
 class InitialiseDatabase {

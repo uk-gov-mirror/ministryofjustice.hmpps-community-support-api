@@ -91,6 +91,8 @@ services:
     base-url: ${ASSESS_RISKS_AND_NEEDS_API_BASE_URL}
   nDelius-api:
     base-url: ${NDELIUS_API_BASE_URL}
+  prison-api:
+    base-url: ${PRISON_API_BASE_URL}
 
 reference-data:
   probation-offices:

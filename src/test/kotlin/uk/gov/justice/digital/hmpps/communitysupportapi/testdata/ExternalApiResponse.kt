@@ -20,6 +20,7 @@ import uk.gov.justice.digital.hmpps.communitysupportapi.dto.delius.HomeOfficeInt
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.delius.OffenderPersonalityDisorderDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.delius.PersonalCircumstanceDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.delius.PersonalDetailsAndCircumstancesDto
+import uk.gov.justice.digital.hmpps.communitysupportapi.dto.prison.PrisonDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.model.PersonAdditionalDetails
 import uk.gov.justice.digital.hmpps.communitysupportapi.util.toJson
 import uk.gov.service.notify.SendEmailResponse
@@ -417,4 +418,28 @@ object ExternalApiResponse {
           "message": "Person not found"
         }
   """.trimIndent()
+
+  // PRISON API DATA
+
+  fun createPrisonDto(
+    agencyId: String = "MDI",
+    description: String = "Moorland (HMP & YOI)",
+    longDescription: String? = "Moorland (HMP & YOI)",
+    agencyType: String = "INST",
+    active: Boolean = true,
+  ): PrisonDto = PrisonDto(
+    agencyId = agencyId,
+    description = description,
+    longDescription = longDescription,
+    agencyType = agencyType,
+    active = active,
+  )
+
+  fun createPrisonsList(): List<PrisonDto> = listOf(
+    createPrisonDto(agencyId = "MDI", description = "Moorland (HMP & YOI)", active = true),
+    createPrisonDto(agencyId = "LEI", description = "Leeds (HMP)", active = true),
+    createPrisonDto(agencyId = "ZZGHI", description = "Inactive Prison (Closed)", active = false),
+  )
+
+  fun prisonsJson() = createPrisonsList().toJson()
 }

@@ -46,4 +46,10 @@ class TestWebClientConfiguration {
   fun nDeliusWebClient(
     @Value("\${services.nDelius-api.base-url}") nDeliusBaseUrl: String,
   ): WebClient = WebClient.builder().baseUrl(nDeliusBaseUrl).build()
+
+  @Bean
+  @Qualifier("prisonApiWebClient")
+  fun prisonApiWebClient(
+    @Value("\${services.prison-api.base-url}") prisonApiBaseUrl: String,
+  ): WebClient = WebClient.builder().baseUrl(prisonApiBaseUrl).build()
 }

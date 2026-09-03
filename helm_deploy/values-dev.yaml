@@ -16,6 +16,7 @@ generic-service:
     SERVICES_CORE_PERSON_RECORD_API_BASE_URL: "https://hmpps-person-record-dev.hmpps.service.justice.gov.uk"
     SERVICES_ASSESS_RISKS_AND_NEEDS_API_BASE_URL: "https://assess-risks-and-needs-dev.hmpps.service.justice.gov.uk"
     SERVICES_NDELIUS_API_BASE_URL: "https://community-support-interventions-and-delius-dev.hmpps.service.justice.gov.uk"
+    SERVICES_PRISON_API_BASE_URL: "https://prison-api-dev.prison.service.justice.gov.uk"
     LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY: DEBUG
     LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB_REACTIVE_FUNCTION_CLIENT: DEBUG
     LOGGING_LEVEL_REACTOR_NETTY_HTTP_CLIENT: DEBUG

@@ -28,6 +28,7 @@ class WebClientConfiguration(
   @Value($$"${services.manage-users-api.base-url}") private val manageUsersAuthBaseUrl: String,
   @Value($$"${services.assess-risks-and-needs-api.base-url}") private val assessRisksAndNeedsBaseUrl: String,
   @Value($$"${services.nDelius-api.base-url}") private val nDeliusBaseUrl: String,
+  @Value($$"${services.prison-api.base-url}") private val prisonApiBaseUrl: String,
   @Value($$"${webclient.read-timeout-seconds}") private val readTimeoutSeconds: Int,
   @Value($$"${webclient.connect-timeout-seconds}") private val authConnectTimeoutSeconds: Long,
   @Value($$"${webclient.write-timeout-seconds}") private val writeTimeoutSeconds: Int,
@@ -81,6 +82,12 @@ class WebClientConfiguration(
     builder: WebClient.Builder,
     authorizedClientManager: OAuth2AuthorizedClientManager,
   ): WebClient = createWebClient(builder, authorizedClientManager, nDeliusBaseUrl)
+
+  @Bean("prisonApiWebClient")
+  fun prisonApiWebClient(
+    builder: WebClient.Builder,
+    authorizedClientManager: OAuth2AuthorizedClientManager,
+  ): WebClient = createWebClient(builder, authorizedClientManager, prisonApiBaseUrl)
 
   private fun createWebClient(
     builder: WebClient.Builder,

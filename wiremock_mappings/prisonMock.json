@@ -1,0 +1,40 @@
+{
+  "mappings": [
+    {
+      "name": "Prison API - get prisons",
+      "request": {
+        "method": "GET",
+        "urlPath": "/prison-api/api/agencies/prisons"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": [
+          {
+            "agencyId": "MDI",
+            "description": "Moorland (HMP & YOI)",
+            "longDescription": "Moorland (HMP & YOI)",
+            "agencyType": "INST",
+            "active": true
+          },
+          {
+            "agencyId": "LEI",
+            "description": "Leeds (HMP)",
+            "longDescription": "Leeds (HMP)",
+            "agencyType": "INST",
+            "active": true
+          },
+          {
+            "agencyId": "WWI",
+            "description": "Wormwood Scrubs (HMP)",
+            "longDescription": "Wormwood Scrubs (HMP)",
+            "agencyType": "INST",
+            "active": false
+          }
+        ]
+      }
+    }
+  ]
+}

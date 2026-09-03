@@ -8,6 +8,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import uk.gov.justice.digital.hmpps.communitysupportapi.dto.SelectionDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.exception.NotFoundException
 import uk.gov.justice.digital.hmpps.communitysupportapi.integration.IntegrationTestBase
 import uk.gov.justice.digital.hmpps.communitysupportapi.integration.ReferralTestSupport
@@ -20,7 +21,8 @@ import uk.gov.justice.digital.hmpps.communitysupportapi.repository.PersonAdditio
 import uk.gov.justice.digital.hmpps.communitysupportapi.repository.ReferralProviderAssignmentRepository
 import uk.gov.justice.digital.hmpps.communitysupportapi.testdata.ExternalApiResponse.createCprProbationPersonDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.util.toJson
-import java.util.UUID
+import java.time.OffsetDateTime
+import java.util.*
 
 class DraftReferralServiceIntegrationTest : IntegrationTestBase() {
 
@@ -212,6 +214,40 @@ class DraftReferralServiceIntegrationTest : IntegrationTestBase() {
 
     assertThatThrownBy { draftReferralService.upsertCommunityServiceProvider(savedReferral.id, request) }
       .isInstanceOf(NotFoundException::class.java)
+  }
+
+  @Test
+  fun getAdditionalInformationForTheDeliveryPartnerSmokeTest() {
+    val referralUser = referralHelper.ensureReferralUser()
+    val createReferralRequest = setUpData()
+
+    val referralCreationResult = referralService.createReferral(referralUser.id, createReferralRequest)
+    val savedReferral = referralCreationResult.referral
+    // create the selection to the database
+    val yesSelectedRequest = SelectionDto.Yes("extra information for delivery partner")
+    val response1 = draftReferralService.updateAdditionalInformationForTheDeliveryPartner(
+      savedReferral.id,
+      yesSelectedRequest,
+      OffsetDateTime.now(),
+    )
+    assertThat(response1.details).isEqualTo(SelectionDto.Yes("extra information for delivery partner"))
+
+    // retrieve the selection from the database
+    val response2 = draftReferralService.getAdditionalInformationForTheDeliveryPartner(savedReferral.id)
+    assertThat(response2.details).isEqualTo(SelectionDto.Yes("extra information for delivery partner"))
+
+    // update the selection in the database
+    val noSelectionRequest = SelectionDto.No
+    val response3 = draftReferralService.updateAdditionalInformationForTheDeliveryPartner(
+      savedReferral.id,
+      noSelectionRequest,
+      OffsetDateTime.now(),
+    )
+    assertThat(response3.details).isEqualTo(SelectionDto.No)
+
+    // check the selection in the database
+    val response4 = draftReferralService.getAdditionalInformationForTheDeliveryPartner(savedReferral.id)
+    assertThat(response4.details).isEqualTo(SelectionDto.No)
   }
 
   private fun setUpData(): CreateReferralRequest {

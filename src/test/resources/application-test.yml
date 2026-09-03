@@ -48,6 +48,8 @@ services:
     base-url: "http://localhost:${wiremock.server.port}"
   nDelius-api:
     base-url: "http://localhost:${wiremock.server.port}"
+  prison-api:
+    base-url: "http://localhost:${wiremock.server.port}"
 webclient:
   connect-timeout-seconds: 20
   read-timeout-seconds: 10

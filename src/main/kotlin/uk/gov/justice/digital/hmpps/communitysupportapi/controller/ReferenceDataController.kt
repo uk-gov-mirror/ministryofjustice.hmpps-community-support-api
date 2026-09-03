@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import uk.gov.justice.digital.hmpps.communitysupportapi.exception.NotFoundException
+import uk.gov.justice.digital.hmpps.communitysupportapi.model.Prison
 import uk.gov.justice.digital.hmpps.communitysupportapi.model.ProbationOffice
 import uk.gov.justice.digital.hmpps.communitysupportapi.service.ReferenceDataService
 
@@ -75,6 +76,32 @@ class ReferenceDataController(
     } catch (e: Exception) {
       log.error("Error getting PDUs", e)
       throw NotFoundException("PDU information not found")
+    }
+  }
+
+  @Operation(summary = "Get all active Prisons")
+  @ApiResponses(
+    value = [
+      ApiResponse(
+        responseCode = "200",
+        description = "Returns the list of active Prisons.",
+        content = [Content(mediaType = "application/json", array = ArraySchema(schema = Schema(implementation = Prison::class)))],
+      ),
+      ApiResponse(
+        responseCode = "500",
+        description = "Failed to retrieve Prisons",
+        content = [Content(mediaType = "application/json")],
+      ),
+    ],
+  )
+  @GetMapping("/prisons")
+  fun getPrisons(): ResponseEntity<List<Prison>> {
+    try {
+      val prisons = referenceDataService.getPrisons()
+      return ResponseEntity.ok(prisons)
+    } catch (e: Exception) {
+      log.error("Error getting Prisons", e)
+      throw NotFoundException("Prisons information not found")
     }
   }
 }

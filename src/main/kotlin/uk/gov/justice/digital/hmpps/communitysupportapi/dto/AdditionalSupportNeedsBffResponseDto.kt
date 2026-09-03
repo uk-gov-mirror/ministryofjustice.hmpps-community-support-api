@@ -1,65 +1,85 @@
 package uk.gov.justice.digital.hmpps.communitysupportapi.dto
 
-import com.fasterxml.jackson.annotation.JsonSubTypes
-import com.fasterxml.jackson.annotation.JsonTypeInfo
 import uk.gov.justice.digital.hmpps.communitysupportapi.entity.Person
 import uk.gov.justice.digital.hmpps.communitysupportapi.entity.PersonAdditionalSupportNeeds
 
-@JsonTypeInfo(
-  use = JsonTypeInfo.Id.NAME,
-  include = JsonTypeInfo.As.PROPERTY,
-  property = "selected",
-  visible = true,
+private fun defaultResponse(refereeName: RefereeNameDto): AdditionalSupportNeedsBffResponseDto = AdditionalSupportNeedsBffResponseDto(
+  refereeName,
+  SelectionDto.Unanswered,
+  SelectionDto.Unanswered,
+  SelectionDto.Unanswered,
+  SelectionDto.Unanswered,
+  SelectionDto.Unanswered,
+  SelectionDto.Unanswered,
+  SelectionDto.Unanswered,
+  SelectionDto.Unanswered,
+  null,
 )
-@JsonSubTypes(
-  JsonSubTypes.Type(value = Selection.Yes::class, name = "Yes"),
-  JsonSubTypes.Type(value = Selection.No::class, name = "No"),
-  JsonSubTypes.Type(value = Selection.Unanswered::class, name = "Unanswered"),
+
+private fun noneNeededResponse(refereeName: RefereeNameDto): AdditionalSupportNeedsBffResponseDto = AdditionalSupportNeedsBffResponseDto(
+  refereeName,
+  SelectionDto.Unanswered,
+  SelectionDto.Unanswered,
+  SelectionDto.Unanswered,
+  SelectionDto.Unanswered,
+  SelectionDto.Unanswered,
+  SelectionDto.Unanswered,
+  SelectionDto.Unanswered,
+  SelectionDto.Unanswered,
+  false,
 )
-sealed interface Selection {
-  data class Yes(val value: String) : Selection
-  data object No : Selection
-  data object Unanswered : Selection
-  companion object {
-    fun fromString(value: String?): Selection = if (value == null) No else Yes(value)
-  }
+
+private fun yesOrNoSelectionFromValue(value: String?): SelectionDto = if (value.isNullOrBlank()) {
+  SelectionDto.No
+} else {
+  SelectionDto.Yes(value)
 }
+
+private fun supportNeededResponse(refereeName: RefereeNameDto, personAdditionalSupportNeeds: PersonAdditionalSupportNeeds): AdditionalSupportNeedsBffResponseDto = AdditionalSupportNeedsBffResponseDto(
+  refereeName,
+  yesOrNoSelectionFromValue(personAdditionalSupportNeeds.physicalHealthDetails),
+  yesOrNoSelectionFromValue(personAdditionalSupportNeeds.mentalEmotionalHealthDetails),
+  yesOrNoSelectionFromValue(personAdditionalSupportNeeds.neurodiversityDetails),
+  yesOrNoSelectionFromValue(personAdditionalSupportNeeds.locationTravelDetails),
+  yesOrNoSelectionFromValue(personAdditionalSupportNeeds.caringResponsibilitiesDetails),
+  yesOrNoSelectionFromValue(personAdditionalSupportNeeds.employmentResponsibilitiesDetails),
+  yesOrNoSelectionFromValue(personAdditionalSupportNeeds.diversityDetails),
+  yesOrNoSelectionFromValue(personAdditionalSupportNeeds.anythingElseDetails),
+  true,
+)
 
 data class AdditionalSupportNeedsBffResponseDto(
   val refereeName: RefereeNameDto,
-  val physicalHealth: Selection,
-  val mentalEmotionalHealth: Selection,
-  val neurodiversity: Selection,
-  val locationTravel: Selection,
-  val caringResponsibilities: Selection,
-  val employmentResponsibilities: Selection,
-  val diversity: Selection,
-  val anythingElse: Selection,
+  val physicalHealth: SelectionDto,
+  val mentalEmotionalHealth: SelectionDto,
+  val neurodiversity: SelectionDto,
+  val locationTravel: SelectionDto,
+  val caringResponsibilities: SelectionDto,
+  val employmentResponsibilities: SelectionDto,
+  val diversity: SelectionDto,
+  val anythingElse: SelectionDto,
   val needsAdditionalSupport: Boolean? = null,
 ) {
   companion object {
-    fun fromNeeds(person: Person, personAdditionalSupportNeeds: PersonAdditionalSupportNeeds): AdditionalSupportNeedsBffResponseDto = AdditionalSupportNeedsBffResponseDto(
-      refereeName = RefereeNameDto(firstName = person.firstName, lastName = person.lastName),
-      physicalHealth = Selection.fromString(personAdditionalSupportNeeds.physicalHealthDetails),
-      mentalEmotionalHealth = Selection.fromString(personAdditionalSupportNeeds.mentalEmotionalHealthDetails),
-      neurodiversity = Selection.fromString(personAdditionalSupportNeeds.neurodiversityDetails),
-      locationTravel = Selection.fromString(personAdditionalSupportNeeds.locationTravelDetails),
-      caringResponsibilities = Selection.fromString(personAdditionalSupportNeeds.caringResponsibilitiesDetails),
-      employmentResponsibilities = Selection.fromString(personAdditionalSupportNeeds.employmentResponsibilitiesDetails),
-      diversity = Selection.fromString(personAdditionalSupportNeeds.diversityDetails),
-      anythingElse = Selection.fromString(personAdditionalSupportNeeds.anythingElseDetails),
-      needsAdditionalSupport = personAdditionalSupportNeeds.additionalSupportNeeded,
-    )
+    fun fromNeeds(person: Person, personAdditionalSupportNeeds: PersonAdditionalSupportNeeds): AdditionalSupportNeedsBffResponseDto {
+      val refereeName = RefereeNameDto(firstName = person.firstName, lastName = person.lastName)
+      return when (personAdditionalSupportNeeds.additionalSupportNeeded) {
+        null -> defaultResponse(refereeName)
+        false -> noneNeededResponse(refereeName)
+        true -> supportNeededResponse(refereeName, personAdditionalSupportNeeds)
+      }
+    }
+
     fun fromPerson(person: Person): AdditionalSupportNeedsBffResponseDto = AdditionalSupportNeedsBffResponseDto(
       refereeName = RefereeNameDto(firstName = person.firstName, lastName = person.lastName),
-      physicalHealth = Selection.Unanswered,
-      mentalEmotionalHealth = Selection.Unanswered,
-      neurodiversity = Selection.Unanswered,
-      locationTravel = Selection.Unanswered,
-      caringResponsibilities = Selection.Unanswered,
-      employmentResponsibilities = Selection.Unanswered,
-      diversity = Selection.Unanswered,
-      anythingElse = Selection.Unanswered,
+      physicalHealth = SelectionDto.Unanswered,
+      mentalEmotionalHealth = SelectionDto.Unanswered,
+      neurodiversity = SelectionDto.Unanswered,
+      locationTravel = SelectionDto.Unanswered,
+      caringResponsibilities = SelectionDto.Unanswered,
+      employmentResponsibilities = SelectionDto.Unanswered,
+      diversity = SelectionDto.Unanswered,
+      anythingElse = SelectionDto.Unanswered,
       needsAdditionalSupport = null,
     )
   }
@@ -67,19 +87,25 @@ data class AdditionalSupportNeedsBffResponseDto(
 
 data class NeedsInterpreterBffResponseDto(
   val refereeName: RefereeNameDto,
-  val language: Selection,
+  val language: SelectionDto,
 ) {
   companion object {
     fun from(person: Person, personAdditionalSupportNeeds: PersonAdditionalSupportNeeds): NeedsInterpreterBffResponseDto {
       val refereeName = RefereeNameDto(firstName = person.firstName, lastName = person.lastName)
       return when (personAdditionalSupportNeeds.interpreterNeeded) {
-        true -> NeedsInterpreterBffResponseDto(refereeName, Selection.fromString(personAdditionalSupportNeeds.interpreterLanguage))
+        true -> NeedsInterpreterBffResponseDto(
+          refereeName,
+          SelectionDto.from(
+            personAdditionalSupportNeeds.interpreterNeeded,
+            personAdditionalSupportNeeds.interpreterLanguage,
+          ),
+        )
         false -> if (personAdditionalSupportNeeds.interpreterLanguage != null) {
-          NeedsInterpreterBffResponseDto(refereeName, Selection.Unanswered)
+          NeedsInterpreterBffResponseDto(refereeName, SelectionDto.Unanswered)
         } else {
-          NeedsInterpreterBffResponseDto(refereeName, Selection.No)
+          NeedsInterpreterBffResponseDto(refereeName, SelectionDto.No)
         }
-        null -> NeedsInterpreterBffResponseDto(refereeName, Selection.Unanswered)
+        null -> NeedsInterpreterBffResponseDto(refereeName, SelectionDto.Unanswered)
       }
     }
   }

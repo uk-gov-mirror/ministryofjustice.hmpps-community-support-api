@@ -83,6 +83,7 @@ abstract class IntegrationTestBase {
       registry.add("services.assess-risks-and-needs-api.base-url") { "http://localhost:${wireMockServer.port()}" }
       registry.add("services.hmpps-auth-api.base-url") { "http://localhost:8090/auth" }
       registry.add("services.nDelius-api.base-url") { "http://localhost:${wireMockServer.port()}" }
+      registry.add("services.prison-api.base-url") { "http://localhost:${wireMockServer.port()}" }
     }
   }
 
