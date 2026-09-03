@@ -21,6 +21,7 @@ import uk.gov.justice.digital.hmpps.communitysupportapi.repository.PersonAdditio
 import uk.gov.justice.digital.hmpps.communitysupportapi.repository.ReferralProviderAssignmentRepository
 import uk.gov.justice.digital.hmpps.communitysupportapi.testdata.ExternalApiResponse.createCprProbationPersonDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.util.toJson
+import java.time.OffsetDateTime
 import java.util.*
 
 class DraftReferralServiceIntegrationTest : IntegrationTestBase() {
@@ -225,7 +226,11 @@ class DraftReferralServiceIntegrationTest : IntegrationTestBase() {
     // create the selection to the database
     run {
       val request = SelectionDto.Yes("extra information for delivery partner")
-      val result = draftReferralService.updateAdditionalInformationForTheDeliveryPartner(savedReferral.id, request)
+      val result = draftReferralService.updateAdditionalInformationForTheDeliveryPartner(
+        savedReferral.id,
+        request,
+        OffsetDateTime.now(),
+      )
       assertThat(result.details).isEqualTo(SelectionDto.Yes("extra information for delivery partner"))
     }
     // retrieve the selection from the database
@@ -236,7 +241,11 @@ class DraftReferralServiceIntegrationTest : IntegrationTestBase() {
     // update the selection in the database
     run {
       val request = SelectionDto.No
-      val result = draftReferralService.updateAdditionalInformationForTheDeliveryPartner(savedReferral.id, request)
+      val result = draftReferralService.updateAdditionalInformationForTheDeliveryPartner(
+        savedReferral.id,
+        request,
+        OffsetDateTime.now(),
+      )
       assertThat(result.details).isEqualTo(SelectionDto.No)
     }
     // check the selection in the database

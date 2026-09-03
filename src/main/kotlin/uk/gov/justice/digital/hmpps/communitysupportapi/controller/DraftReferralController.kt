@@ -35,6 +35,7 @@ import uk.gov.justice.digital.hmpps.communitysupportapi.service.CriminogenicNeed
 import uk.gov.justice.digital.hmpps.communitysupportapi.service.DraftReferralService
 import uk.gov.justice.digital.hmpps.communitysupportapi.service.ReferralService
 import uk.gov.justice.hmpps.kotlin.auth.HmppsAuthenticationHolder
+import java.time.OffsetDateTime
 import java.util.UUID
 
 @RestController
@@ -382,7 +383,7 @@ class DraftReferralController(
     @PathVariable referralId: UUID,
     @RequestBody request: SelectionDto,
   ): ResponseEntity<AdditionalInformationForTheDeliveryPartnerBffResponseDto> = ResponseEntity.ok(
-    draftReferralService.updateAdditionalInformationForTheDeliveryPartner(referralId, request),
+    draftReferralService.updateAdditionalInformationForTheDeliveryPartner(referralId, request, OffsetDateTime.now()),
   )
 
   @Operation(summary = "Update the Offence and Sentence information for a Draft Referral")

@@ -58,7 +58,6 @@ class DraftReferralService(
   private val probationPractitionerDetailsRepository: ProbationPractitionerDetailsRepository,
   private val identifierValidator: PersonIdentifierValidator,
   private val nDeliusService: NDeliusService,
-  private val timePort: TimePort,
 ) {
   private data class ReferralSupportNeedsContext(
     val referral: Referral,
@@ -394,6 +393,7 @@ class DraftReferralService(
   fun updateAdditionalInformationForTheDeliveryPartner(
     referralId: UUID,
     selection: SelectionDto,
+    updatedAt: OffsetDateTime,
   ): AdditionalInformationForTheDeliveryPartnerBffResponseDto {
     val referral = referralRepository.findById(referralId)
       .orElseThrow { NotFoundException("Referral not found for id $referralId") }
@@ -403,7 +403,7 @@ class DraftReferralService(
 
     referral.hasAdditionalInformationForTheDeliveryPartner = selection.toTriState()
     referral.additionalInformationForTheDeliveryPartner = selection.value()
-    referral.updatedAt = timePort.now()
+    referral.updatedAt = updatedAt
 
     referralRepository.save(referral)
     return AdditionalInformationForTheDeliveryPartnerBffResponseDto.from(person, referral)

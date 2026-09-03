@@ -68,9 +68,6 @@ class DraftReferralServiceTest {
   lateinit var identifierValidator: PersonIdentifierValidator
 
   @Mock
-  lateinit var timePort: TimePort
-
-  @Mock
   lateinit var nDeliusService: NDeliusService
 
   @InjectMocks
@@ -108,7 +105,7 @@ class DraftReferralServiceTest {
 
     @BeforeEach
     fun setup() {
-      reset(referralRepository, personRepository, timePort)
+      reset(referralRepository, personRepository)
       referral = Referral(
         id = referralId,
         personId = personId,
@@ -161,9 +158,7 @@ class DraftReferralServiceTest {
 
     @Test
     fun updateAdditionalInformationForTheDeliveryPartnerWithNoAdditionalInformation() {
-      whenever(timePort.now()).thenReturn(fixedInstant)
-
-      val result = draftReferralService.updateAdditionalInformationForTheDeliveryPartner(referralId, SelectionDto.No)
+      val result = draftReferralService.updateAdditionalInformationForTheDeliveryPartner(referralId, SelectionDto.No, fixedInstant)
 
       val captor = argumentCaptor<Referral>()
       verify(referralRepository).save(captor.capture())
