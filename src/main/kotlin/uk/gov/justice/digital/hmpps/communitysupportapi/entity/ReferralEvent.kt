@@ -18,6 +18,7 @@ enum class ReferralEventType {
   SUBMITTED,
   UPDATED,
   APPOINTMENT_FEEDBACK_SENT,
+  WITHDRAWN,
 }
 
 enum class ActorType {

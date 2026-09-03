@@ -40,6 +40,8 @@ import uk.gov.justice.digital.hmpps.communitysupportapi.integration.AppointmentT
 import uk.gov.justice.digital.hmpps.communitysupportapi.integration.IntegrationTestBase
 import uk.gov.justice.digital.hmpps.communitysupportapi.integration.ReferralTestSupport
 import uk.gov.justice.digital.hmpps.communitysupportapi.model.CreateReferralRequest
+import uk.gov.justice.digital.hmpps.communitysupportapi.model.ReferralWithdrawalReasonCode
+import uk.gov.justice.digital.hmpps.communitysupportapi.model.WithdrawReferralRequest
 import uk.gov.justice.digital.hmpps.communitysupportapi.repository.AppointmentDeliveryRepository
 import uk.gov.justice.digital.hmpps.communitysupportapi.repository.AppointmentIcsRepository
 import uk.gov.justice.digital.hmpps.communitysupportapi.repository.AppointmentRepository
@@ -49,6 +51,7 @@ import uk.gov.justice.digital.hmpps.communitysupportapi.repository.PersonReposit
 import uk.gov.justice.digital.hmpps.communitysupportapi.repository.ReferralProviderAssignmentRepository
 import uk.gov.justice.digital.hmpps.communitysupportapi.repository.ReferralRepository
 import uk.gov.justice.digital.hmpps.communitysupportapi.repository.ReferralUserRepository
+import uk.gov.justice.digital.hmpps.communitysupportapi.repository.ReferralWithdrawalDetailsRepository
 import uk.gov.justice.digital.hmpps.communitysupportapi.testdata.ExternalApiResponse.CRN
 import uk.gov.justice.digital.hmpps.communitysupportapi.testdata.ExternalApiResponse.cprProbationPersonJson
 import uk.gov.justice.digital.hmpps.communitysupportapi.testdata.ExternalApiResponse.cprProbationPersonNoFixAbodeJson
@@ -81,6 +84,9 @@ class ReferralControllerIntegrationTest : IntegrationTestBase() {
 
   @Autowired
   private lateinit var referralUserRepository: ReferralUserRepository
+
+  @Autowired
+  private lateinit var referralWithdrawalDetailsRepository: ReferralWithdrawalDetailsRepository
 
   @Autowired
   private lateinit var appointmentRepository: AppointmentRepository
@@ -384,6 +390,119 @@ class ReferralControllerIntegrationTest : IntegrationTestBase() {
         .exchange()
         .expectStatus()
         .is4xxClientError
+        .expectStatus()
+        .isEqualTo(409)
+    }
+  }
+
+  @Nested
+  @DisplayName("POST /referral/{referralReference}/withdraw")
+  inner class WithdrawReferral {
+
+    @BeforeEach
+    fun setup() {
+      testDataCleaner.cleanAllTables()
+      testUser = referralHelper.ensureReferralUser()
+    }
+
+    @Test
+    fun `should return unauthorized if no token`() {
+      assertUnauthorized(HttpMethod.POST, "/referral/AB1234CD/withdraw")
+    }
+
+    @Test
+    fun `should return forbidden if no role`() {
+      assertForbiddenNoRole(
+        HttpMethod.POST,
+        "/referral/AB1234CD/withdraw",
+        WithdrawReferralRequest(
+          reasonCode = ReferralWithdrawalReasonCode.SENTENCE_EXPIRED,
+          additionalDetails = "Some details",
+        ),
+      )
+    }
+
+    @Test
+    fun `should return forbidden if wrong role`() {
+      assertForbiddenWrongRole(
+        HttpMethod.POST,
+        "/referral/AB1234CD/withdraw",
+        WithdrawReferralRequest(
+          reasonCode = ReferralWithdrawalReasonCode.SENTENCE_EXPIRED,
+          additionalDetails = "Some details",
+        ),
+      )
+    }
+
+    @Test
+    fun `should return OK and save withdrawal details and event`() {
+      whenever(userMapper.fromToken(any<HmppsAuthenticationHolder>())).thenReturn(testUser)
+
+      val referral = referralHelper.createReferral(submittedBy = testUser)
+
+      webTestClient.post()
+        .uri("/referral/${referral.referenceNumber}/withdraw")
+        .headers(setAuthorisation())
+        .bodyValue(
+          WithdrawReferralRequest(
+            reasonCode = ReferralWithdrawalReasonCode.SENTENCE_EXPIRED,
+            additionalDetails = "  Sentence expired  ",
+          ),
+        )
+        .exchange()
+        .expectStatus()
+        .isOk
+
+      val savedWithdrawalDetails = referralWithdrawalDetailsRepository.findByReferralId(referral.id)
+      assertThat(savedWithdrawalDetails).isNotNull()
+      assertThat(savedWithdrawalDetails?.reasonCode).isEqualTo("SENTENCE_EXPIRED")
+      assertThat(savedWithdrawalDetails?.reasonDetails).isEqualTo("Sentence expired")
+
+      val updatedReferral = referralRepository.findById(referral.id).get()
+      assertThat(updatedReferral.referralEvents.any { it.eventType == ReferralEventType.WITHDRAWN }).isTrue()
+    }
+
+    @Test
+    fun `should return Not Found when referral does not exist`() {
+      whenever(userMapper.fromToken(any<HmppsAuthenticationHolder>())).thenReturn(testUser)
+
+      webTestClient.post()
+        .uri("/referral/ZZ9999ZZ/withdraw")
+        .headers(setAuthorisation())
+        .bodyValue(
+          WithdrawReferralRequest(
+            reasonCode = ReferralWithdrawalReasonCode.SENTENCE_EXPIRED,
+            additionalDetails = "Some details",
+          ),
+        )
+        .exchange()
+        .expectStatus()
+        .isNotFound
+    }
+
+    @Test
+    fun `should return conflict when referral has already been withdrawn`() {
+      whenever(userMapper.fromToken(any<HmppsAuthenticationHolder>())).thenReturn(testUser)
+
+      val referral = referralHelper.createReferral(submittedBy = testUser)
+      val request = WithdrawReferralRequest(
+        reasonCode = ReferralWithdrawalReasonCode.SENTENCE_EXPIRED,
+        additionalDetails = "Some details",
+      )
+
+      webTestClient.post()
+        .uri("/referral/${referral.referenceNumber}/withdraw")
+        .headers(setAuthorisation())
+        .bodyValue(request)
+        .exchange()
+        .expectStatus()
+        .isOk
+
+      webTestClient.post()
+        .uri("/referral/${referral.referenceNumber}/withdraw")
+        .headers(setAuthorisation())
+        .bodyValue(request)
+        .exchange()
         .expectStatus()
         .isEqualTo(409)
     }

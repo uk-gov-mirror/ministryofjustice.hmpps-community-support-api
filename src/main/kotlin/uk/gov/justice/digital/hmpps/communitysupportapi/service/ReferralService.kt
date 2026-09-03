@@ -24,12 +24,14 @@ import uk.gov.justice.digital.hmpps.communitysupportapi.entity.PersonAdditionalD
 import uk.gov.justice.digital.hmpps.communitysupportapi.entity.Referral
 import uk.gov.justice.digital.hmpps.communitysupportapi.entity.ReferralEvent
 import uk.gov.justice.digital.hmpps.communitysupportapi.entity.ReferralEventType
+import uk.gov.justice.digital.hmpps.communitysupportapi.entity.ReferralWithdrawalDetails
 import uk.gov.justice.digital.hmpps.communitysupportapi.exception.ConflictException
 import uk.gov.justice.digital.hmpps.communitysupportapi.exception.NotFoundException
 import uk.gov.justice.digital.hmpps.communitysupportapi.mapper.toEntity
 import uk.gov.justice.digital.hmpps.communitysupportapi.model.CreateReferralRequest
 import uk.gov.justice.digital.hmpps.communitysupportapi.model.PersonAggregate
 import uk.gov.justice.digital.hmpps.communitysupportapi.model.PersonIdentifier
+import uk.gov.justice.digital.hmpps.communitysupportapi.model.WithdrawReferralRequest
 import uk.gov.justice.digital.hmpps.communitysupportapi.repository.AppointmentIcsFeedbackRepository
 import uk.gov.justice.digital.hmpps.communitysupportapi.repository.AppointmentIcsRepository
 import uk.gov.justice.digital.hmpps.communitysupportapi.repository.AppointmentRepository
@@ -38,6 +40,7 @@ import uk.gov.justice.digital.hmpps.communitysupportapi.repository.PersonReposit
 import uk.gov.justice.digital.hmpps.communitysupportapi.repository.ReferralProviderAssignmentRepository
 import uk.gov.justice.digital.hmpps.communitysupportapi.repository.ReferralRepository
 import uk.gov.justice.digital.hmpps.communitysupportapi.repository.ReferralUserAssignmentRepository
+import uk.gov.justice.digital.hmpps.communitysupportapi.repository.ReferralWithdrawalDetailsRepository
 import uk.gov.justice.digital.hmpps.communitysupportapi.util.parseDateOfBirth
 import uk.gov.justice.digital.hmpps.communitysupportapi.validation.PersonIdentifierValidator
 import java.time.OffsetDateTime
@@ -52,6 +55,7 @@ class ReferralService(
   private val appointmentStatusHistoryRepository: AppointmentStatusHistoryRepository,
   private val referralProviderAssignmentRepository: ReferralProviderAssignmentRepository,
   private val referralUserAssignmentRepository: ReferralUserAssignmentRepository,
+  private val referralWithdrawalDetailsRepository: ReferralWithdrawalDetailsRepository,
   private val referenceGenerator: ReferralReferenceGenerator,
   private val appointmentIcsFeedbackRepository: AppointmentIcsFeedbackRepository,
   private val referralLookupService: ReferralLookupService,
@@ -206,6 +210,44 @@ class ReferralService(
       personId = savedReferral.personId,
       referenceNumber = savedReferral.referenceNumber,
     )
+  }
+
+  @Transactional
+  fun withdrawReferral(
+    referralReference: String,
+    userId: UUID,
+    request: WithdrawReferralRequest,
+  ) {
+    val foundReferral = referralLookupService.findByCaseIdentifier(referralReference)
+    val validatedRequest = request.validateAndNormalise()
+
+    if (referralWithdrawalDetailsRepository.findByReferralId(foundReferral.id) != null) {
+      throw ConflictException("Referral $referralReference has already been withdrawn")
+    }
+
+    val now = OffsetDateTime.now()
+    referralWithdrawalDetailsRepository.save(
+      ReferralWithdrawalDetails(
+        id = UUID.randomUUID(),
+        referralId = foundReferral.id,
+        reasonCode = validatedRequest.reasonCode.name,
+        reasonDetails = validatedRequest.additionalDetails,
+        createdAt = now,
+        createdBy = userId,
+      ),
+    )
+
+    foundReferral.addEvent(
+      ReferralEvent(
+        id = UUID.randomUUID(),
+        referral = foundReferral,
+        eventType = ReferralEventType.WITHDRAWN,
+        createdAt = now,
+        actorType = ActorType.AUTH,
+        actorId = userId,
+      ),
+    )
+    referralRepository.save(foundReferral)
   }
 
   fun getReferralProgress(referralIdentifier: String): ReferralProgressDto {
