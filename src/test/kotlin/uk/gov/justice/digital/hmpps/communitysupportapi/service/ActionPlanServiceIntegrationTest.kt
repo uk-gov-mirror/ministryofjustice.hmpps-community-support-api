@@ -2,6 +2,7 @@ package uk.gov.justice.digital.hmpps.communitysupportapi.service
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -11,9 +12,11 @@ import org.springframework.beans.factory.annotation.Autowired
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.ActionPlanSessionDeliveryDetailsRequest
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.SessionDeliveryDetailsQuestionAnswer
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.SessionDeliveryDetailsQuestionAnswers
+import uk.gov.justice.digital.hmpps.communitysupportapi.entity.ActionPlan
 import uk.gov.justice.digital.hmpps.communitysupportapi.entity.ActionPlanQuestionAnswerType
 import uk.gov.justice.digital.hmpps.communitysupportapi.entity.ActionPlanQuestionResponseEventType
 import uk.gov.justice.digital.hmpps.communitysupportapi.entity.ActionPlanQuestionType
+import uk.gov.justice.digital.hmpps.communitysupportapi.entity.ActionPlanStep
 import uk.gov.justice.digital.hmpps.communitysupportapi.entity.ActionPlanStepQuestion
 import uk.gov.justice.digital.hmpps.communitysupportapi.entity.ActionPlanStepQuestionAnswerDetails
 import uk.gov.justice.digital.hmpps.communitysupportapi.entity.ActionPlanStepQuestionAnswerHeader
@@ -91,7 +94,8 @@ class ActionPlanServiceIntegrationTest :
   @DisplayName("findOrCreateByReferralId")
   inner class FindOrCreateByReferralId {
     val user = referralHelper.ensureReferralUser()
-    val globalTemplate = actionPlanTemplateRepository.getGlobalActionPlanTemplate() ?: throw NotFoundException("Cannot find Global ActionPlan")
+    val globalTemplate = actionPlanTemplateRepository.getGlobalActionPlanTemplate()
+      ?: throw NotFoundException("Cannot find Global ActionPlan")
 
     @Test
     fun `should not create an additional ActionPlan when one already exists`() {
@@ -151,13 +155,15 @@ class ActionPlanServiceIntegrationTest :
   @DisplayName("getActionPlanSummaryForReferral")
   inner class GetActionPlanSummaryForReferral {
     val user = referralHelper.ensureReferralUser()
-    val globalTemplate = actionPlanTemplateRepository.getGlobalActionPlanTemplate() ?: throw NotFoundException("Cannot find Global ActionPlan")
+    val globalTemplate = actionPlanTemplateRepository.getGlobalActionPlanTemplate()
+      ?: throw NotFoundException("Cannot find Global ActionPlan")
 
     @Test
     fun `should return person details and needs for a referral`() {
       // Given
       val person = referralHelper.createPerson(firstName = "Adam", lastName = "Smith")
-      val referral = referralHelper.createReferral(person = person, referenceNumber = randomReferralReference(), submittedBy = user)
+      val referral =
+        referralHelper.createReferral(person = person, referenceNumber = randomReferralReference(), submittedBy = user)
 
       // When
       val result = actionPlanService.getActionPlanSummaryForReferral(referral.referenceNumber!!)
@@ -173,7 +179,8 @@ class ActionPlanServiceIntegrationTest :
     fun `should return latest revision content for an outcome answer`() {
       // Given
       val person = referralHelper.createPerson(firstName = "Jane", lastName = "Doe")
-      val referral = referralHelper.createReferral(person = person, referenceNumber = randomReferralReference(), submittedBy = user)
+      val referral =
+        referralHelper.createReferral(person = person, referenceNumber = randomReferralReference(), submittedBy = user)
       val actionPlan = actionPlanHelper.createActionPlan(referralId = referral.id, templateId = globalTemplate.id)
       val need = needRepository.findAllByOrderByOrderNumberAsc().first()
       val outcomeQuestion = findOutcomeQuestionForNeed(globalTemplate.id, need.id)
@@ -223,7 +230,8 @@ class ActionPlanServiceIntegrationTest :
     fun `should return multiple outcome answers in order for the same need`() {
       // Given
       val person = referralHelper.createPerson(firstName = "Ella", lastName = "Brown")
-      val referral = referralHelper.createReferral(person = person, referenceNumber = randomReferralReference(), submittedBy = user)
+      val referral =
+        referralHelper.createReferral(person = person, referenceNumber = randomReferralReference(), submittedBy = user)
       val actionPlan = actionPlanHelper.createActionPlan(referralId = referral.id, templateId = globalTemplate.id)
       val need = needRepository.findAllByOrderByOrderNumberAsc().first()
       val outcomeQuestion = findOutcomeQuestionForNeed(globalTemplate.id, need.id)
@@ -284,7 +292,8 @@ class ActionPlanServiceIntegrationTest :
     fun `should ignore soft deleted answers when building outcomes`() {
       // Given
       val person = referralHelper.createPerson(firstName = "Sam", lastName = "Green")
-      val referral = referralHelper.createReferral(person = person, referenceNumber = randomReferralReference(), submittedBy = user)
+      val referral =
+        referralHelper.createReferral(person = person, referenceNumber = randomReferralReference(), submittedBy = user)
       val actionPlan = actionPlanHelper.createActionPlan(referralId = referral.id, templateId = globalTemplate.id)
       val need = needRepository.findAllByOrderByOrderNumberAsc().first()
       val outcomeQuestion = findOutcomeQuestionForNeed(globalTemplate.id, need.id)
@@ -357,12 +366,14 @@ class ActionPlanServiceIntegrationTest :
   @DisplayName("getMostRecentResponseToQuestionForActionPlan")
   inner class GetMostRecentResponseToQuestionForActionPlan {
     val user = referralHelper.ensureReferralUser()
-    val globalTemplate = actionPlanTemplateRepository.getGlobalActionPlanTemplate() ?: throw NotFoundException("Cannot find Global ActionPlan")
+    val globalTemplate = actionPlanTemplateRepository.getGlobalActionPlanTemplate()
+      ?: throw NotFoundException("Cannot find Global ActionPlan")
 
     @Test
     fun `should return the latest details for an active answer to the question`() {
       val person = referralHelper.createPerson(firstName = "Chris", lastName = "Taylor")
-      val referral = referralHelper.createReferral(person = person, referenceNumber = randomReferralReference(), submittedBy = user)
+      val referral =
+        referralHelper.createReferral(person = person, referenceNumber = randomReferralReference(), submittedBy = user)
       val actionPlan = actionPlanHelper.createActionPlan(referralId = referral.id, templateId = globalTemplate.id)
       val question = actionPlanStepQuestionRepository.findAll().first()
       val now = OffsetDateTime.now()
@@ -442,17 +453,33 @@ class ActionPlanServiceIntegrationTest :
   @DisplayName("session delivery details")
   inner class SessionDeliveryDetails {
     val user = referralHelper.ensureReferralUser()
+    private lateinit var referral: Referral
+    private lateinit var actionPlan: ActionPlan
+    private lateinit var sessionDeliveryStep: ActionPlanStep
+
+    @BeforeEach
+    fun setUpSessionDeliveryDetails() {
+      val person = referralHelper.createPerson(firstName = "Jane", lastName = "Doe")
+      referral =
+        referralHelper.createReferral(person = person, referenceNumber = randomReferralReference(), submittedBy = user)
+      val actionPlanTemplate = actionPlanHelper.createActionPlanTemplate()
+      actionPlan = actionPlanHelper.createActionPlan(referralId = referral.id, templateId = actionPlanTemplate.id)
+      sessionDeliveryStep = createSessionDeliveryStep(actionPlanTemplate.id)
+    }
 
     @Test
     fun `should return saved responses and choices ordered by display order`() {
-      val referral = createReferral()
-      val actionPlanTemplate = actionPlanHelper.createActionPlanTemplate()
-      val actionPlan = actionPlanHelper.createActionPlan(referralId = referral.id, templateId = actionPlanTemplate.id)
-      val sessionDeliveryStep = createSessionDeliveryStep(actionPlanTemplate.id)
-      val question = createSessionDeliveryQuestion(sessionDeliveryStep.id, 1, "How will the session be delivered?", ActionPlanQuestionAnswerType.RADIO, 1)
+      val question = createSessionDeliveryQuestion(1, "How will the session be delivered?")
 
-      createChoice(question.id, 1, "Face-to-face", "FACE_TO_FACE")
-      createChoice(question.id, 2, "Other", "OTHER", hasFreeText = true, freeTextLabel = "Reason for not meeting face-to-face")
+      createChoice(question, 1, "Face-to-face", "FACE_TO_FACE")
+      createChoice(
+        question,
+        2,
+        "Other",
+        "OTHER",
+        hasFreeText = true,
+        freeTextLabel = "Reason for not meeting face-to-face",
+      )
 
       val answerId = UUID.randomUUID()
       actionPlanStepQuestionAnswerHeaderRepository.save(
@@ -490,62 +517,51 @@ class ActionPlanServiceIntegrationTest :
 
     @Test
     fun `should save, update, and soft delete session delivery answers`() {
-      val referral = createReferral()
-      val actionPlanTemplate = actionPlanHelper.createActionPlanTemplate()
-      val actionPlan = actionPlanHelper.createActionPlan(referralId = referral.id, templateId = actionPlanTemplate.id)
-      val sessionDeliveryStep = createSessionDeliveryStep(actionPlanTemplate.id)
+      val radioQuestion = createSessionDeliveryQuestion(1, "How will the session be delivered?")
+      createChoice(radioQuestion, 1, "Face-to-face", "FACE_TO_FACE")
+      createChoice(radioQuestion, 2, "Other", "OTHER", hasFreeText = true, freeTextLabel = "Reason")
 
-      val radioQuestion = createSessionDeliveryQuestion(sessionDeliveryStep.id, 1, "How will the session be delivered?", ActionPlanQuestionAnswerType.RADIO, 1)
-      createChoice(radioQuestion.id, 1, "Face-to-face", "FACE_TO_FACE")
-      createChoice(radioQuestion.id, 2, "Other", "OTHER", hasFreeText = true, freeTextLabel = "Reason")
+      val secondQuestion = createSessionDeliveryQuestion(2, "Which support is needed?")
+      createChoice(secondQuestion, 1, "Short session", "SHORT_SESSION")
+      createChoice(secondQuestion, 2, "Long session", "LONG_SESSION")
 
-      val secondQuestion = createSessionDeliveryQuestion(sessionDeliveryStep.id, 2, "Which support is needed?", ActionPlanQuestionAnswerType.RADIO, 1)
-      createChoice(secondQuestion.id, 1, "Short session", "SHORT_SESSION")
-      createChoice(secondQuestion.id, 2, "Long session", "LONG_SESSION")
-
-      val saveRequest = ActionPlanSessionDeliveryDetailsRequest(
-        answers = listOf(
-          SessionDeliveryDetailsQuestionAnswers(
-            questionId = radioQuestion.id,
-            incomingAnswerDetails = listOf(
-              SessionDeliveryDetailsQuestionAnswer(value = "OTHER", additionalDetails = "Poor weather"),
-            ),
-          ),
-          SessionDeliveryDetailsQuestionAnswers(
-            questionId = secondQuestion.id,
-            incomingAnswerDetails = listOf(
-              SessionDeliveryDetailsQuestionAnswer(value = "SHORT_SESSION"),
-            ),
-          ),
-        ),
+      val saveRequest = sessionDeliveryDetailsRequest(
+        radioQuestion to listOf(sessionDeliveryDetailsAnswer("OTHER", "Poor weather")),
+        secondQuestion to listOf(sessionDeliveryDetailsAnswer("SHORT_SESSION")),
       )
 
-      val saveResult = actionPlanService.updateSessionDeliveryDetailsForActionPlan(referral.referenceNumber!!, saveRequest, user.id.toString())
-      assertEquals(listOf("OTHER"), saveResult.questions.first { it.id == radioQuestion.id }.savedResponses.map { it.value })
-      assertEquals(listOf("Poor weather"), saveResult.questions.first { it.id == radioQuestion.id }.savedResponses.map { it.additionalDetails })
-      assertEquals(listOf("SHORT_SESSION"), saveResult.questions.first { it.id == secondQuestion.id }.savedResponses.map { it.value })
-
-      val updateRequest = ActionPlanSessionDeliveryDetailsRequest(
-        answers = listOf(
-          SessionDeliveryDetailsQuestionAnswers(
-            questionId = radioQuestion.id,
-            incomingAnswerDetails = listOf(
-              SessionDeliveryDetailsQuestionAnswer(value = "FACE_TO_FACE"),
-            ),
-          ),
-          SessionDeliveryDetailsQuestionAnswers(
-            questionId = secondQuestion.id,
-            incomingAnswerDetails = emptyList(),
-          ),
-        ),
+      val saveResult = updateSessionDeliveryDetails(saveRequest)
+      assertEquals(
+        listOf("OTHER"),
+        saveResult.questions.first { it.id == radioQuestion.id }.savedResponses.map { it.value },
+      )
+      assertEquals(
+        listOf("Poor weather"),
+        saveResult.questions.first { it.id == radioQuestion.id }.savedResponses.map { it.additionalDetails },
+      )
+      assertEquals(
+        listOf("SHORT_SESSION"),
+        saveResult.questions.first { it.id == secondQuestion.id }.savedResponses.map { it.value },
       )
 
-      val updateResult = actionPlanService.updateSessionDeliveryDetailsForActionPlan(referral.referenceNumber!!, updateRequest, user.id.toString())
-      assertEquals(listOf("FACE_TO_FACE"), updateResult.questions.first { it.id == radioQuestion.id }.savedResponses.map { it.value })
-      assertEquals(listOf(null), updateResult.questions.first { it.id == radioQuestion.id }.savedResponses.map { it.additionalDetails })
+      val updateRequest = sessionDeliveryDetailsRequest(
+        radioQuestion to listOf(sessionDeliveryDetailsAnswer("FACE_TO_FACE")),
+        secondQuestion to emptyList(),
+      )
+
+      val updateResult = updateSessionDeliveryDetails(updateRequest)
+      assertEquals(
+        listOf("FACE_TO_FACE"),
+        updateResult.questions.first { it.id == radioQuestion.id }.savedResponses.map { it.value },
+      )
+      assertEquals(
+        listOf(null),
+        updateResult.questions.first { it.id == radioQuestion.id }.savedResponses.map { it.additionalDetails },
+      )
       assertTrue(updateResult.questions.first { it.id == secondQuestion.id }.savedResponses.isEmpty())
 
-      val activeAnswers = actionPlanStepQuestionAnswerHeaderRepository.findAllByActionPlanIdAndDeletedAtIsNull(actionPlan.id)
+      val activeAnswers =
+        actionPlanStepQuestionAnswerHeaderRepository.findAllByActionPlanIdAndDeletedAtIsNull(actionPlan.id)
       assertEquals(1, activeAnswers.count { it.actionPlanStepQuestionId == radioQuestion.id })
       assertEquals(0, activeAnswers.count { it.actionPlanStepQuestionId == secondQuestion.id })
       assertEquals(
@@ -594,46 +610,41 @@ class ActionPlanServiceIntegrationTest :
 
     @Test
     fun `should support multiple selected checkbox answers using one header per selected option`() {
-      val referral = createReferral()
-      val actionPlanTemplate = actionPlanHelper.createActionPlanTemplate()
-      val actionPlan = actionPlanHelper.createActionPlan(referralId = referral.id, templateId = actionPlanTemplate.id)
-      val sessionDeliveryStep = createSessionDeliveryStep(actionPlanTemplate.id)
-      val checkboxQuestion = createSessionDeliveryQuestion(sessionDeliveryStep.id, 1, "Which of these are available?", ActionPlanQuestionAnswerType.CHECKBOX, 3)
-      createChoice(checkboxQuestion.id, 1, "In person", "IN_PERSON")
-      createChoice(checkboxQuestion.id, 2, "By phone", "PHONE")
-      createChoice(checkboxQuestion.id, 3, "By video call", "VIDEO")
+      val checkboxQuestion = createSessionDeliveryQuestion(
+        orderNumber = 1,
+        title = "Which of these are available?",
+        answerType = ActionPlanQuestionAnswerType.CHECKBOX,
+        maxNumberResponses = 3,
+      )
+      createChoice(checkboxQuestion, 1, "In person", "IN_PERSON")
+      createChoice(checkboxQuestion, 2, "By phone", "PHONE")
+      createChoice(checkboxQuestion, 3, "By video call", "VIDEO")
 
-      val initialRequest = ActionPlanSessionDeliveryDetailsRequest(
-        answers = listOf(
-          SessionDeliveryDetailsQuestionAnswers(
-            questionId = checkboxQuestion.id,
-            incomingAnswerDetails = listOf(
-              SessionDeliveryDetailsQuestionAnswer(value = "IN_PERSON"),
-              SessionDeliveryDetailsQuestionAnswer(value = "PHONE"),
-            ),
-          ),
+      val initialRequest = sessionDeliveryDetailsRequest(
+        checkboxQuestion to listOf(
+          sessionDeliveryDetailsAnswer("IN_PERSON"),
+          sessionDeliveryDetailsAnswer("PHONE"),
         ),
       )
 
-      actionPlanService.updateSessionDeliveryDetailsForActionPlan(referral.referenceNumber!!, initialRequest, user.id.toString())
+      updateSessionDeliveryDetails(initialRequest)
 
-      val updateRequest = ActionPlanSessionDeliveryDetailsRequest(
-        answers = listOf(
-          SessionDeliveryDetailsQuestionAnswers(
-            questionId = checkboxQuestion.id,
-            incomingAnswerDetails = listOf(
-              SessionDeliveryDetailsQuestionAnswer(value = "IN_PERSON"),
-              SessionDeliveryDetailsQuestionAnswer(value = "VIDEO"),
-            ),
-          ),
+      val updateRequest = sessionDeliveryDetailsRequest(
+        checkboxQuestion to listOf(
+          sessionDeliveryDetailsAnswer("IN_PERSON"),
+          sessionDeliveryDetailsAnswer("VIDEO"),
         ),
       )
 
-      val updateResult = actionPlanService.updateSessionDeliveryDetailsForActionPlan(referral.referenceNumber!!, updateRequest, user.id.toString())
-      assertEquals(listOf("IN_PERSON", "VIDEO"), updateResult.questions.single { it.id == checkboxQuestion.id }.savedResponses.map { it.value })
+      val updateResult = updateSessionDeliveryDetails(updateRequest)
+      assertEquals(
+        listOf("IN_PERSON", "VIDEO"),
+        updateResult.questions.single { it.id == checkboxQuestion.id }.savedResponses.map { it.value },
+      )
 
-      val activeHeaders = actionPlanStepQuestionAnswerHeaderRepository.findAllByActionPlanIdAndDeletedAtIsNull(actionPlan.id)
-        .filter { it.actionPlanStepQuestionId == checkboxQuestion.id }
+      val activeHeaders =
+        actionPlanStepQuestionAnswerHeaderRepository.findAllByActionPlanIdAndDeletedAtIsNull(actionPlan.id)
+          .filter { it.actionPlanStepQuestionId == checkboxQuestion.id }
       assertEquals(2, activeHeaders.size)
       assertEquals(
         setOf("IN_PERSON", "VIDEO"),
@@ -714,14 +725,13 @@ class ActionPlanServiceIntegrationTest :
     )
 
     private fun createSessionDeliveryQuestion(
-      actionPlanStepId: UUID,
       orderNumber: Int,
       title: String,
-      answerType: ActionPlanQuestionAnswerType,
-      maxNumberResponses: Int,
+      answerType: ActionPlanQuestionAnswerType = ActionPlanQuestionAnswerType.RADIO,
+      maxNumberResponses: Int = 1,
     ) = actionPlanStepQuestionRepository.save(
       ActionPlanStepQuestionFactory()
-        .withActionPlanStepId(actionPlanStepId)
+        .withActionPlanStepId(sessionDeliveryStep.id)
         .withOrderNumber(orderNumber)
         .withTitle(title)
         .withAnswerType(answerType)
@@ -730,7 +740,7 @@ class ActionPlanServiceIntegrationTest :
     )
 
     private fun createChoice(
-      actionPlanStepQuestionId: UUID,
+      question: ActionPlanStepQuestion,
       orderNumber: Int,
       label: String,
       value: String,
@@ -738,7 +748,7 @@ class ActionPlanServiceIntegrationTest :
       freeTextLabel: String? = null,
     ) = actionPlanStepQuestionChoiceRepository.save(
       ActionPlanStepQuestionChoiceFactory()
-        .withActionPlanStepQuestionId(actionPlanStepQuestionId)
+        .withActionPlanStepQuestionId(question.id)
         .withOrderNumber(orderNumber)
         .withLabel(label)
         .withValue(value)
@@ -747,9 +757,29 @@ class ActionPlanServiceIntegrationTest :
         .create(),
     )
 
-    private fun createReferral(): Referral {
-      val person = referralHelper.createPerson(firstName = "Jane", lastName = "Doe")
-      return referralHelper.createReferral(person = person, referenceNumber = randomReferralReference(), submittedBy = user)
-    }
+    private fun sessionDeliveryDetailsRequest(
+      vararg answers: Pair<ActionPlanStepQuestion, List<SessionDeliveryDetailsQuestionAnswer>>,
+    ) = ActionPlanSessionDeliveryDetailsRequest(
+      answers = answers.map { (question, incomingAnswerDetails) ->
+        SessionDeliveryDetailsQuestionAnswers(
+          questionId = question.id,
+          incomingAnswerDetails = incomingAnswerDetails,
+        )
+      },
+    )
+
+    private fun sessionDeliveryDetailsAnswer(
+      value: String,
+      additionalDetails: String? = null,
+    ) = SessionDeliveryDetailsQuestionAnswer(
+      value = value,
+      additionalDetails = additionalDetails,
+    )
+
+    private fun updateSessionDeliveryDetails(request: ActionPlanSessionDeliveryDetailsRequest) = actionPlanService.updateSessionDeliveryDetailsForActionPlan(
+      referral.referenceNumber!!,
+      request,
+      user.id.toString(),
+    )
   }
 }
