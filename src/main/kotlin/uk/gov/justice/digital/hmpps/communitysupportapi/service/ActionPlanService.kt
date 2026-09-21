@@ -13,7 +13,6 @@ import uk.gov.justice.digital.hmpps.communitysupportapi.dto.ActionPlanSessionDel
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.ActionPlanSessionDeliveryDetailsResponse
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.ActionPlanStepQuestionDto
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.ActionPlanSummaryDto
-import uk.gov.justice.digital.hmpps.communitysupportapi.dto.SavedResponse
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.SessionDeliveryDetailsQuestionAnswer
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.SessionDeliveryDetailsQuestionAnswers
 import uk.gov.justice.digital.hmpps.communitysupportapi.dto.SessionDeliveryQuestion
@@ -63,62 +62,6 @@ class ActionPlanService(
 ) {
   companion object {
     private val logger = LoggerFactory.getLogger(ActionPlanService::class.java)
-  }
-
-  private inner class QuestionAnswerHelper(
-    private val actionPlanId: UUID,
-    private val question: ActionPlanStepQuestion,
-    private val changedBy: String,
-    private val changedAt: OffsetDateTime,
-    private val questionResponseChangeBatchId: UUID,
-    private val latestDetailsByHeaderId: Map<UUID, ActionPlanStepQuestionAnswerDetails>,
-  ) {
-    fun latestDetails(header: ActionPlanStepQuestionAnswerHeader): ActionPlanStepQuestionAnswerDetails? = latestDetailsByHeaderId[header.id]
-
-    fun createHeader(orderNumber: Int): ActionPlanStepQuestionAnswerHeader = actionPlanStepQuestionAnswerHeaderRepository.save(
-      ActionPlanStepQuestionAnswerHeader.from(
-        actionPlanId = actionPlanId,
-        questionId = question.id,
-        orderNumber = orderNumber,
-        createdBy = changedBy,
-        createdAt = changedAt,
-      ),
-    )
-
-    fun softDelete(header: ActionPlanStepQuestionAnswerHeader) {
-      actionPlanStepQuestionAnswerHeaderRepository.save(header.delete(changedAt, changedBy))
-      recordEvent(header.id, ActionPlanQuestionResponseEventType.DELETED)
-    }
-
-    fun writeDetailsRevision(
-      header: ActionPlanStepQuestionAnswerHeader,
-      response: SavedResponse,
-      latestDetails: ActionPlanStepQuestionAnswerDetails?,
-    ) {
-      actionPlanStepQuestionAnswerDetailsRepository.save(
-        ActionPlanStepQuestionAnswerDetails.from(
-          headerId = header.id,
-          revisionNumber = (latestDetails?.revisionNumber ?: 0) + 1,
-          content = response.value,
-          freeTextValue = response.additionalDetails,
-          createdBy = changedBy,
-          createdAt = changedAt,
-        ),
-      )
-    }
-
-    fun recordEvent(headerId: UUID, eventType: ActionPlanQuestionResponseEventType) {
-      actionPlanQuestionResponseEventRepository.save(
-        ActionPlanQuestionResponseEvent.actionPlanQuestionResponseEventForResponses(
-          actionPlanId = actionPlanId,
-          responseHeaderId = headerId,
-          eventType = eventType,
-          createdBy = changedBy,
-          createdAt = changedAt,
-          questionResponseChangeBatchId = questionResponseChangeBatchId,
-        ),
-      )
-    }
   }
 
   @Transactional
@@ -193,19 +136,32 @@ class ActionPlanService(
       )
     }
 
-    val activeHeadersByQuestionId = actionPlanStepQuestionAnswerHeaderRepository
+    val activeHeaders = actionPlanStepQuestionAnswerHeaderRepository
       .findActiveByPlanAndQuestionIds(
         actionPlan.id,
         questions.map { it.id },
       )
-      .groupBy { it.actionPlanStepQuestionId }
-    val latestDetailsByHeaderId = getLatestDetailsByHeaderId(activeHeadersByQuestionId.values.flatten())
+    val answerDetails = if (activeHeaders.isEmpty()) {
+      emptyList()
+    } else {
+      actionPlanStepQuestionAnswerDetailsRepository
+        .findAllByActionPlanStepQuestionAnswerHeaderIdIn(activeHeaders.map { it.id })
+    }
 
     return ActionPlanSessionDeliveryDetailsResponse(
       questions = questions.map { question ->
         val questionDto = ActionPlanStepQuestionDto.fromEntity(question)
-        val responses = activeHeadersByQuestionId[question.id].orEmpty()
-          .mapNotNull { latestDetailsByHeaderId[it.id] }
+        val responses = activeHeaders
+          .filter { it.actionPlanStepQuestionId == question.id }
+          .mapNotNull { header ->
+            answerDetails
+              .filter { it.actionPlanStepQuestionAnswerHeaderId == header.id }
+              .maxWithOrNull(
+                compareBy<ActionPlanStepQuestionAnswerDetails> { it.revisionNumber }
+                  .thenBy { it.createdAt }
+                  .thenBy { it.id },
+              )
+          }
         val choices = question.choices.sortedBy { choice -> choice.orderNumber }
         SessionDeliveryQuestion.fromQuestionAndResponses(questionDto, responses, choices)
       },
@@ -231,56 +187,165 @@ class ActionPlanService(
     val questions = actionPlanStepQuestionRepository
       .findAllByActionPlanStepIdOrderByOrderNumberAsc(sessionDeliveryStep.id)
 
-    val questionsById = questions.associateBy { it.id }
+    val incomingAnswers = request.answers
 
-    validateSessionDeliveryDetailsRequest(request, questionsById)
-    patchQuestionAnswers(actionPlan.id, questionsById, request.answers, changedBy, changedAt)
+    validateQuestionAndAnswerCounts(questions, incomingAnswers)
 
-    return getSessionDeliveryDetailsForReferral(referralReference)
-  }
-
-  @Transactional
-  fun patchQuestionAnswers(
-    actionPlanId: UUID,
-    questionsById: Map<UUID, ActionPlanStepQuestion>,
-    questionAnswers: List<SessionDeliveryDetailsQuestionAnswers>,
-    changedBy: String,
-    changedAt: OffsetDateTime,
-  ) {
     val questionResponseChangeBatchId = UUID.randomUUID()
-    val requestedQuestionIds = questionAnswers.map { it.questionId }.toSet()
-    val existingHeadersByQuestionId = if (requestedQuestionIds.isEmpty()) {
-      emptyMap()
+
+    val existingHeaders = actionPlanStepQuestionAnswerHeaderRepository
+      .findActiveByPlanAndQuestionIds(
+        actionPlan.id,
+        questions.map { it.id },
+      )
+
+    val existingAnswerDetails = if (existingHeaders.isEmpty()) {
+      emptyList()
     } else {
-      actionPlanStepQuestionAnswerHeaderRepository
-        .findActiveByPlanAndQuestionIds(
-          actionPlanId,
-          requestedQuestionIds,
-        )
-        .groupBy { it.actionPlanStepQuestionId }
+      actionPlanStepQuestionAnswerDetailsRepository
+        .findAllByActionPlanStepQuestionAnswerHeaderIdIn(existingHeaders.map { it.id })
     }
-    val latestDetailsByHeaderId = getLatestDetailsByHeaderId(existingHeadersByQuestionId.values.flatten())
 
-    questionAnswers.forEach { questionAnswer ->
-      val question = questionsById[questionAnswer.questionId]
-        ?: throw ValidationException("Question ${questionAnswer.questionId} does not belong to session delivery details")
+    questions.forEach { deliveryDetailsQuestion ->
+      val existingHeadersForQuestion = existingHeaders
+        .filter { it.actionPlanStepQuestionId == deliveryDetailsQuestion.id }
 
-      upsertQuestionAnswers(
-        actionPlanId = actionPlanId,
-        question = question,
-        responses = questionAnswer.incomingAnswerDetails.map {
-          SavedResponse(
-            value = it.value,
-            additionalDetails = it.additionalDetails,
+      val existingAnswerDetailsForQuestion = existingAnswerDetails.filter { answerDetails ->
+        existingHeadersForQuestion.any { it.id == answerDetails.actionPlanStepQuestionAnswerHeaderId }
+      }
+
+      val incomingAnswerToQuestion = incomingAnswers
+        .filter { it.questionId == deliveryDetailsQuestion.id }
+        .flatMap { it.incomingAnswerDetails }
+        .map {
+          it.copy(
+            value = it.value.trim(),
+            additionalDetails = it.additionalDetails?.trim()?.takeIf { details -> details.isNotEmpty() },
           )
-        },
-        existingHeaders = existingHeadersByQuestionId[questionAnswer.questionId].orEmpty(),
-        latestDetailsByHeaderId = latestDetailsByHeaderId,
-        changedBy = changedBy,
-        changedAt = changedAt,
-        questionResponseChangeBatchId = questionResponseChangeBatchId,
+        }
+
+      fun latestDetailsForHeader(header: ActionPlanStepQuestionAnswerHeader): ActionPlanStepQuestionAnswerDetails? = existingAnswerDetailsForQuestion
+        .filter { it.actionPlanStepQuestionAnswerHeaderId == header.id }
+        .maxWithOrNull(
+          compareBy<ActionPlanStepQuestionAnswerDetails> { it.revisionNumber }
+            .thenBy { it.createdAt }
+            .thenBy { it.id },
+        )
+
+      fun softDelete(questionAnswerHeader: ActionPlanStepQuestionAnswerHeader) {
+        actionPlanStepQuestionAnswerHeaderRepository.save(questionAnswerHeader.delete(changedAt, changedBy))
+        actionPlanQuestionResponseEventRepository.save(
+          ActionPlanQuestionResponseEvent.actionPlanQuestionResponseEventForResponses(
+            actionPlanId = actionPlan.id,
+            responseHeaderId = questionAnswerHeader.id,
+            eventType = ActionPlanQuestionResponseEventType.DELETED,
+            createdBy = changedBy,
+            createdAt = changedAt,
+            questionResponseChangeBatchId = questionResponseChangeBatchId,
+          ),
+        )
+      }
+
+      fun saveResponse(
+        questionAnswerHeader: ActionPlanStepQuestionAnswerHeader,
+        response: SessionDeliveryDetailsQuestionAnswer,
+        latestDetails: ActionPlanStepQuestionAnswerDetails?,
+        eventType: ActionPlanQuestionResponseEventType,
+      ) {
+        actionPlanStepQuestionAnswerDetailsRepository.save(
+          ActionPlanStepQuestionAnswerDetails.from(
+            headerId = questionAnswerHeader.id,
+            revisionNumber = (latestDetails?.revisionNumber ?: 0) + 1,
+            content = response.value,
+            freeTextValue = response.additionalDetails,
+            createdBy = changedBy,
+            createdAt = changedAt,
+          ),
+        )
+        actionPlanQuestionResponseEventRepository.save(
+          ActionPlanQuestionResponseEvent.actionPlanQuestionResponseEventForResponses(
+            actionPlanId = actionPlan.id,
+            responseHeaderId = questionAnswerHeader.id,
+            eventType = eventType,
+            createdBy = changedBy,
+            createdAt = changedAt,
+            questionResponseChangeBatchId = questionResponseChangeBatchId,
+          ),
+        )
+      }
+
+      if (deliveryDetailsQuestion.supportsMultipleResponses) {
+        val requestedValues = incomingAnswerToQuestion.map { it.value }.toSet()
+
+        existingHeadersForQuestion
+          .filter { latestDetailsForHeader(it)?.content !in requestedValues }
+          .forEach(::softDelete)
+
+        var nextOrderNumber = (existingHeadersForQuestion.maxOfOrNull { it.orderNumber } ?: 0) + 1
+
+        incomingAnswerToQuestion.forEach { response ->
+          val existingHeader = existingHeadersForQuestion
+            .firstOrNull { latestDetailsForHeader(it)?.content == response.value }
+
+          val latestDetails = existingHeader?.let(::latestDetailsForHeader)
+
+          if (latestDetails?.hasSameContentAs(response.value, response.additionalDetails) == true) {
+            return@forEach
+          }
+
+          val questionAnswerHeader = existingHeader
+            ?: actionPlanStepQuestionAnswerHeaderRepository.save(
+              ActionPlanStepQuestionAnswerHeader.from(
+                actionPlanId = actionPlan.id,
+                questionId = deliveryDetailsQuestion.id,
+                orderNumber = nextOrderNumber++,
+                createdBy = changedBy,
+                createdAt = changedAt,
+              ),
+            )
+
+          saveResponse(
+            questionAnswerHeader,
+            response,
+            latestDetails,
+            if (existingHeader == null) ActionPlanQuestionResponseEventType.CREATED else ActionPlanQuestionResponseEventType.UPDATED,
+          )
+        }
+        return@forEach
+      }
+
+      val existingHeader = existingHeadersForQuestion.singleOrNull()
+      val response = incomingAnswerToQuestion.singleOrNull()
+      if (response == null) {
+        existingHeader?.let(::softDelete)
+        return@forEach
+      }
+
+      val questionAnswerHeader = existingHeader
+        ?: actionPlanStepQuestionAnswerHeaderRepository.save(
+          ActionPlanStepQuestionAnswerHeader.from(
+            actionPlanId = actionPlan.id,
+            questionId = deliveryDetailsQuestion.id,
+            orderNumber = 1,
+            createdBy = changedBy,
+            createdAt = changedAt,
+          ),
+        )
+      val latestDetails = existingHeader?.let(::latestDetailsForHeader)
+
+      if (latestDetails?.hasSameContentAs(response.value, response.additionalDetails) == true) {
+        return@forEach
+      }
+
+      saveResponse(
+        questionAnswerHeader,
+        response,
+        latestDetails,
+        if (existingHeader == null) ActionPlanQuestionResponseEventType.CREATED else ActionPlanQuestionResponseEventType.UPDATED,
       )
     }
+
+    return getSessionDeliveryDetailsForReferral(referralReference)
   }
 
   private fun createForReferral(referralId: UUID): ActionPlan {
@@ -302,20 +367,28 @@ class ActionPlanService(
     return actionPlan
   }
 
-  private fun validateSessionDeliveryDetailsRequest(
-    request: ActionPlanSessionDeliveryDetailsRequest,
-    questionsById: Map<UUID, ActionPlanStepQuestion>,
+  private fun validateQuestionAndAnswerCounts(
+    questions: List<ActionPlanStepQuestion>,
+    answers: List<SessionDeliveryDetailsQuestionAnswers>,
   ) {
-    request.answers.forEach { questionRequest ->
-      val question = questionsById[questionRequest.questionId]
-        ?: throw ValidationException("Question ${questionRequest.questionId} does not belong to session delivery details")
+    questions.forEach { question ->
+      val answersForQuestion = answers.filter { it.questionId == question.id }
 
-      if (questionRequest.incomingAnswerDetails.size > question.maxNumberResponses) {
-        throw ValidationException("Question ${question.id} accepts at most $question.maxNumberResponses responses")
+      if (question.supportsMultipleResponses && answersForQuestion.size > question.maxNumberResponses) {
+        throw ValidationException("Question ${question.id} accepts at most $question.maxNumberResponses responses (${answersForQuestion.size} provided)")
+      }
+    }
+
+    answers.forEach { answer ->
+      val questionForAnswer = questions.find { it.id == answer.questionId }
+        ?: throw ValidationException("Question ${answer.questionId} does not belong to session delivery details")
+
+      if (answer.incomingAnswerDetails.size > questionForAnswer.maxNumberResponses) {
+        throw ValidationException("Question ${questionForAnswer.id} accepts at most $questionForAnswer.maxNumberResponses responses")
       }
 
-      questionRequest.incomingAnswerDetails.forEach { response ->
-        validateSavedResponseForQuestionAnswers(question, response)
+      answer.incomingAnswerDetails.forEach { response ->
+        validateSavedResponseForQuestionAnswers(questionForAnswer, response)
       }
     }
   }
@@ -325,6 +398,7 @@ class ActionPlanService(
     response: SessionDeliveryDetailsQuestionAnswer,
   ) {
     val value = response.value.trim()
+
     if (value.isBlank()) {
       throw ValidationException("Question ${question.id} contains a blank response value")
     }
@@ -351,125 +425,6 @@ class ActionPlanService(
         }
       }
     }
-  }
-
-  private fun upsertQuestionAnswers(
-    actionPlanId: UUID,
-    question: ActionPlanStepQuestion,
-    responses: List<SavedResponse>,
-    existingHeaders: List<ActionPlanStepQuestionAnswerHeader>,
-    latestDetailsByHeaderId: Map<UUID, ActionPlanStepQuestionAnswerDetails>,
-    changedBy: String,
-    changedAt: OffsetDateTime,
-    questionResponseChangeBatchId: UUID,
-  ) {
-    val normalisedResponses = responses.map { it.normalised() }
-    val questionAnswerhelper = QuestionAnswerHelper(
-      actionPlanId = actionPlanId,
-      question = question,
-      changedBy = changedBy,
-      changedAt = changedAt,
-      questionResponseChangeBatchId = questionResponseChangeBatchId,
-      latestDetailsByHeaderId = latestDetailsByHeaderId,
-    )
-
-    if (question.supportsMultipleResponses) {
-      upsertMultipleResponses(questionAnswerhelper, normalisedResponses, existingHeaders)
-    } else {
-      upsertSingleResponse(questionAnswerhelper, normalisedResponses.singleOrNull(), existingHeaders.singleOrNull())
-    }
-  }
-
-  private fun upsertSingleResponse(
-    questionAnswerHelper: QuestionAnswerHelper,
-    response: SavedResponse?,
-    existingHeader: ActionPlanStepQuestionAnswerHeader?,
-  ) {
-    if (response == null) {
-      existingHeader?.let { questionAnswerHelper.softDelete(it) }
-      return
-    }
-
-    val header = existingHeader ?: questionAnswerHelper.createHeader(orderNumber = 1)
-    val latestDetails = questionAnswerHelper.latestDetails(header)
-
-    if (latestDetails?.hasSameContentAs(response) == true) {
-      return
-    }
-
-    questionAnswerHelper.writeDetailsRevision(header, response, latestDetails)
-    questionAnswerHelper.recordEvent(
-      headerId = header.id,
-      eventType = if (existingHeader == null) {
-        ActionPlanQuestionResponseEventType.CREATED
-      } else {
-        ActionPlanQuestionResponseEventType.UPDATED
-      },
-    )
-  }
-
-  private fun upsertMultipleResponses(
-    questionAnswerHelper: QuestionAnswerHelper,
-    responses: List<SavedResponse>,
-    existingHeaders: List<ActionPlanStepQuestionAnswerHeader>,
-  ) {
-    val requestedValues = responses.map { it.value }.toSet()
-    val activeHeaderByValue = existingHeaders
-      .mapNotNull { header ->
-        questionAnswerHelper.latestDetails(header)?.content?.let { it to header }
-      }
-      .toMap()
-
-    existingHeaders
-      .filter { header ->
-        val currentValue = questionAnswerHelper.latestDetails(header)?.content
-        currentValue != null && currentValue !in requestedValues
-      }
-      .forEach { questionAnswerHelper.softDelete(it) }
-
-    var nextOrderNumber = (existingHeaders.maxOfOrNull { it.orderNumber } ?: 0) + 1
-
-    responses.forEach { response ->
-      val existingHeader = activeHeaderByValue[response.value]
-      val header = existingHeader ?: questionAnswerHelper.createHeader(orderNumber = nextOrderNumber).also {
-        nextOrderNumber += 1
-      }
-      val latestDetails = questionAnswerHelper.latestDetails(header)
-
-      if (latestDetails?.hasSameContentAs(response) == true) {
-        return@forEach
-      }
-
-      questionAnswerHelper.writeDetailsRevision(header, response, latestDetails)
-      questionAnswerHelper.recordEvent(
-        headerId = header.id,
-        eventType = if (existingHeader == null) {
-          ActionPlanQuestionResponseEventType.CREATED
-        } else {
-          ActionPlanQuestionResponseEventType.UPDATED
-        },
-      )
-    }
-  }
-
-  private fun getLatestDetailsByHeaderId(
-    headers: List<ActionPlanStepQuestionAnswerHeader>,
-  ): Map<UUID, ActionPlanStepQuestionAnswerDetails> {
-    if (headers.isEmpty()) {
-      return emptyMap()
-    }
-
-    return actionPlanStepQuestionAnswerDetailsRepository
-      .findAllByActionPlanStepQuestionAnswerHeaderIdIn(headers.map { it.id })
-      .groupBy { it.actionPlanStepQuestionAnswerHeaderId }
-      .mapNotNull { (headerId, details) ->
-        details.maxWithOrNull(
-          compareBy<ActionPlanStepQuestionAnswerDetails> { it.revisionNumber }
-            .thenBy { it.createdAt }
-            .thenBy { it.id },
-        )?.let { headerId to it }
-      }
-      .toMap()
   }
 
   private fun getOutcomesByNeedIdForActionPlan(

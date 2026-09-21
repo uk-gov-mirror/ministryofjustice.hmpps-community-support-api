@@ -17,7 +17,7 @@ class SessionDeliveryQuestion(
   val answerType: ActionPlanQuestionAnswerType,
   val maximumNumberOfResponses: Int,
   val choices: List<QuestionChoice>? = null,
-  val savedResponses: List<SavedResponse> = emptyList(),
+  val savedResponses: List<SessionDeliveryDetailsQuestionAnswer> = emptyList(),
 ) {
   companion object {
     fun fromQuestionAndResponses(
@@ -32,7 +32,7 @@ class SessionDeliveryQuestion(
       answerType = question.answerType,
       maximumNumberOfResponses = question.maximumNumberOfResponses,
       savedResponses = responses.map { response ->
-        SavedResponse(response.content ?: "", response.freeTextValue)
+        SessionDeliveryDetailsQuestionAnswer(response.content ?: "", response.freeTextValue)
       },
       choices = choices.map { choice ->
         QuestionChoice(

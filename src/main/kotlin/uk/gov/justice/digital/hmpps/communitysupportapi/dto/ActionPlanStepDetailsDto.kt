@@ -29,7 +29,7 @@ data class ActionPlanStepQuestionDto(
   val answerType: ActionPlanQuestionAnswerType,
   val maximumNumberOfResponses: Int,
   val choices: List<QuestionChoice>? = null,
-  val savedResponses: List<SavedResponse> = emptyList(),
+  val savedResponses: List<SessionDeliveryDetailsQuestionAnswer> = emptyList(),
 ) {
   companion object {
     fun fromEntity(question: ActionPlanStepQuestion): ActionPlanStepQuestionDto = ActionPlanStepQuestionDto(
@@ -51,13 +51,3 @@ data class QuestionChoice(
   val additionalDetailsLabel: String?,
   val additionalDetailsHint: String? = null,
 )
-
-data class SavedResponse(
-  val value: String,
-  val additionalDetails: String? = null,
-) {
-  fun normalised(): SavedResponse = SavedResponse(
-    value = value.trim(),
-    additionalDetails = additionalDetails?.trim()?.takeIf { it.isNotEmpty() },
-  )
-}
