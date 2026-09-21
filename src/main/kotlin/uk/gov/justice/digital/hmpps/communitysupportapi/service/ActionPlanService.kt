@@ -206,7 +206,9 @@ class ActionPlanService(
         .findAllByActionPlanStepQuestionAnswerHeaderIdIn(existingHeaders.map { it.id })
     }
 
-    questions.forEach { deliveryDetailsQuestion ->
+      questions
+        .filter { question -> incomingAnswers.any { it.questionId == question.id } }
+        .forEach { deliveryDetailsQuestion ->
       val existingHeadersForQuestion = existingHeaders
         .filter { it.actionPlanStepQuestionId == deliveryDetailsQuestion.id }
 
