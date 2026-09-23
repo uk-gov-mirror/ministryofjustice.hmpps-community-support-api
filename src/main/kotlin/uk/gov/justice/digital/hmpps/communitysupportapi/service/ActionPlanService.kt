@@ -379,7 +379,7 @@ class ActionPlanService(
         .flatMap { it.incomingAnswerDetails }
 
       if (question.supportsMultipleResponses && incomingAnswerDetails.size > question.maxNumberResponses) {
-        throw ValidationException("Question ${question.id} accepts at most $question.maxNumberResponses responses (${incomingAnswerDetails.size} provided)")
+        throw ValidationException("Question ${question.id} accepts at most ${question.maxNumberResponses} responses (${incomingAnswerDetails.size} provided)")
       }
     }
 
@@ -388,7 +388,7 @@ class ActionPlanService(
         ?: throw ValidationException("Question ${answer.questionId} does not belong to session delivery details")
 
       if (answer.incomingAnswerDetails.size > questionForAnswer.maxNumberResponses) {
-        throw ValidationException("Question ${questionForAnswer.id} accepts at most $questionForAnswer.maxNumberResponses responses")
+        throw ValidationException("Question ${questionForAnswer.id} accepts at most ${questionForAnswer.maxNumberResponses} responses")
       }
 
       answer.incomingAnswerDetails.forEach { response ->
